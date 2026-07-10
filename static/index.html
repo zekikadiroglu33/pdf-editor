@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pdfer — PDF Text Editor</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181b24; --border: #2a2f3d;
+    --text: #e8eaf0; --muted: #8b91a3; --accent: #4f8cff; --ok: #3ecf8e; --err: #ff6b6b;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 40px 16px;
+  }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin-bottom: 28px; font-size: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px; width: 100%; max-width: 900px;
+  }
+  .drop {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 28px;
+    text-align: center; color: var(--muted); cursor: pointer; transition: .15s;
+  }
+  .drop.over, .drop:hover { border-color: var(--accent); color: var(--text); }
+  .drop.hasfile { border-style: solid; border-color: var(--ok); color: var(--ok); }
+  .hint { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+  .toolbar {
+    display: none; align-items: center; gap: 10px; margin-top: 10px;
+  }
+  .toolbar.show { display: flex; }
+  .toolbar button {
+    margin: 0; width: auto; padding: 6px 12px; font-size: 14px; font-weight: 600;
+    border-radius: 6px; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  }
+  .toolbar button:hover:not(:disabled) { filter: none; border-color: var(--accent); }
+  .toolbar span { font-size: 13px; color: var(--muted); min-width: 44px; text-align: center; }
+  .viewer {
+    display: none; max-height: 65vh; overflow: auto; margin-top: 10px;
+    background: #05060a; border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  }
+  .viewer.show { display: block; }
+  .page-wrap {
+    position: relative; margin: 0 auto 16px; background: #fff;
+    box-shadow: 0 2px 14px rgba(0,0,0,.5);
+  }
+  .page-wrap:last-child { margin-bottom: 0; }
+  .page-wrap canvas { display: block; }
+  .textLayer {
+    position: absolute; inset: 0; overflow: hidden; line-height: 1;
+  }
+  .textLayer span, .textLayer br {
+    color: transparent; position: absolute; white-space: pre; cursor: text;
+    transform-origin: 0% 0%;
+  }
+  .textLayer ::selection { background: rgba(79,140,255,.4); }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 18px 0 6px; }
+  input[type=text] {
+    width: 100%; padding: 11px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 15px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+  button {
+    margin-top: 22px; width: 100%; padding: 13px; border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.12); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  #status { margin-top: 14px; font-size: 14px; min-height: 20px; }
+  #status.ok { color: var(--ok); } #status.err { color: var(--err); }
+  #result { width: 100%; max-width: 900px; margin-top: 28px; display: none; }
+  #result iframe {
+    width: 100%; height: 640px; border: 1px solid var(--border);
+    border-radius: 10px; background: #fff;
+  }
+  #dl {
+    display: inline-block; margin-bottom: 12px; color: var(--accent);
+    font-weight: 600; text-decoration: none;
+  }
+</style>
+</head>
+<body>
+  <h1>pdf<span>er</span></h1>
+  <p class="sub">Upload a PDF, find text, replace it. Powered by a Go backend.</p>
+
+  <div class="card">
+    <div class="drop" id="drop">Drop a PDF here or click to choose</div>
+    <input type="file" id="file" accept="application/pdf" hidden>
+
+    <p class="hint" id="viewerHint" style="display:none">Drag to select the text you want to change, right in the page below — it fills "Find text" automatically. Zoom in for small text to select it precisely.</p>
+    <div class="toolbar" id="toolbar">
+      <button type="button" id="zoomOut">− Zoom out</button>
+      <span id="zoomLevel">150%</span>
+      <button type="button" id="zoomIn">+ Zoom in</button>
+    </div>
+    <div class="viewer" id="viewer"></div>
+
+    <label for="find">Find text</label>
+    <input type="text" id="find" placeholder="e.g. ACME Corp">
+
+    <label for="replace">Replace with</label>
+    <input type="text" id="replace" placeholder="e.g. Globex Inc">
+
+    <button id="go" disabled>Edit PDF</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="result">
+    <a id="dl" download="edited.pdf">⬇ Download edited.pdf</a>
+    <iframe id="preview" title="Edited PDF preview"></iframe>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  const drop = document.getElementById('drop');
+  const fileIn = document.getElementById('file');
+  const go = document.getElementById('go');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const viewer = document.getElementById('viewer');
+  const viewerHint = document.getElementById('viewerHint');
+  const toolbar = document.getElementById('toolbar');
+  const zoomIn = document.getElementById('zoomIn');
+  const zoomOut = document.getElementById('zoomOut');
+  const zoomLevel = document.getElementById('zoomLevel');
+  const findInput = document.getElementById('find');
+  const MIN_SCALE = 0.5, MAX_SCALE = 5, ZOOM_STEP = 0.25;
+  let pdfFile = null;
+  let pdfDoc = null;
+  let scale = 1.5;
+
+  const setStatus = (msg, cls = '') => { status.textContent = msg; status.className = cls; };
+
+  async function renderPages() {
+    viewer.innerHTML = '';
+    zoomLevel.textContent = Math.round(scale * 100) + '%';
+    try {
+      for (let n = 1; n <= pdfDoc.numPages; n++) {
+        const page = await pdfDoc.getPage(n);
+        const viewport = page.getViewport({ scale });
+
+        const wrap = document.createElement('div');
+        wrap.className = 'page-wrap';
+        wrap.style.width = viewport.width + 'px';
+        wrap.style.height = viewport.height + 'px';
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        wrap.appendChild(canvas);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+        const textLayerDiv = document.createElement('div');
+        textLayerDiv.className = 'textLayer';
+        wrap.appendChild(textLayerDiv);
+
+        const textContent = await page.getTextContent();
+        await pdfjsLib.renderTextLayer({
+          textContentSource: textContent,
+          container: textLayerDiv,
+          viewport,
+        }).promise;
+
+        viewer.appendChild(wrap);
+      }
+
+      viewer.classList.add('show');
+      viewerHint.style.display = 'block';
+      toolbar.classList.add('show');
+    } catch (err) {
+      setStatus('Could not render preview: ' + err.message, 'err');
+    }
+  }
+
+  async function renderPreview(file) {
+    viewer.innerHTML = '';
+    viewer.classList.remove('show');
+    viewerHint.style.display = 'none';
+    toolbar.classList.remove('show');
+    try {
+      const buf = await file.arrayBuffer();
+      pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+      scale = 1.5;
+      await renderPages();
+    } catch (err) {
+      setStatus('Could not render preview: ' + err.message, 'err');
+    }
+  }
+
+  function setZoom(next) {
+    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, next));
+    renderPages();
+  }
+  zoomIn.addEventListener('click', () => setZoom(scale + ZOOM_STEP));
+  zoomOut.addEventListener('click', () => setZoom(scale - ZOOM_STEP));
+
+  viewer.addEventListener('mouseup', () => {
+    const sel = window.getSelection().toString().replace(/\s+/g, ' ').trim();
+    if (sel) {
+      findInput.value = sel;
+      findInput.focus();
+    }
+  });
+
+  const setFile = f => {
+    if (!f || f.type !== 'application/pdf') { setStatus('Please choose a PDF file.', 'err'); return; }
+    pdfFile = f;
+    drop.textContent = `📄 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+    drop.classList.add('hasfile');
+    go.disabled = false;
+    setStatus('');
+    renderPreview(f);
+  };
+
+  drop.addEventListener('click', () => fileIn.click());
+  fileIn.addEventListener('change', () => setFile(fileIn.files[0]));
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('over');
+    setFile(e.dataTransfer.files[0]);
+  });
+
+  go.addEventListener('click', async () => {
+    const find = document.getElementById('find').value;
+    if (!find) { setStatus('Enter the text to find.', 'err'); return; }
+
+    const form = new FormData();
+    form.append('file', pdfFile);
+    form.append('find', find);
+    form.append('replace', document.getElementById('replace').value);
+
+    go.disabled = true;
+    setStatus('Editing…');
+    result.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/edit', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(await res.text());
+
+      const count = res.headers.get('X-Replacements') || '0';
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      document.getElementById('preview').src = url;
+      document.getElementById('dl').href = url;
+      result.style.display = 'block';
+
+      if (count === '0') {
+        setStatus('Done, but no matches were found. (Some fonts encode text non-literally — see README limitations.)', 'err');
+      } else {
+        setStatus(`Done — ${count} replacement(s) made.`, 'ok');
+      }
+    } catch (err) {
+      setStatus('Error: ' + err.message, 'err');
+    } finally {
+      go.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
