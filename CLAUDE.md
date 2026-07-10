@@ -16,8 +16,19 @@ With C, C++, and Rust excluded, the fastest practical choices are **Go**, **C#**
 Editing text inside a PDF is hard because content streams are compressed and split across objects. pdfer uses a 3-stage pipeline:
 
 1. **Normalize** — `qpdf` rewrites the upload as a classic PDF: object streams disabled, content streams uncompressed. Now the text operators (`(Hello) Tj`) are plain bytes.
-2. **Replace** — the Go engine parses every top-level object (walking dictionaries and using `/Length` to safely skip binary stream data), performs the find/replace inside every non-image stream (with proper PDF literal-string escaping for `(`, `)`, `\`), and updates each stream's `/Length`.
+2. **Replace** — the `find`/`replace` strings arrive from the client as UTF-8, but PDF content streams store text as raw bytes in whatever single-byte encoding the font declares (almost always WinAnsiEncoding, i.e. Windows-1252). `encoding.go` transcodes both strings into the selected language's byte table *before* searching, then the Go engine parses every top-level object (walking dictionaries and using `/Length` to safely skip binary stream data) and performs the byte-level find/replace inside every non-image stream (with proper PDF literal-string escaping for `(`, `)`, `\`), updating each stream's `/Length`.
 3. **Rebuild** — the file is re-serialized with a fresh, valid `xref` table and trailer, then recompressed with `qpdf`.
+
+### Language / character-encoding support
+
+`encoding.go` builds a `rune -> byte` table per supported language and exposes it as `encodingTables[lang]`:
+
+- `"latin"` (default) — WinAnsiEncoding/Windows-1252, i.e. ASCII plus Latin-1 accented characters.
+- `"turkish"` — Windows-1254: identical to `"latin"` except the six code points where Windows swaps in Turkish letters (ş, Ş, ğ, Ğ, ı, İ) in place of four Icelandic ones.
+
+`EditPDF` looks up the table for the request's `lang`, transcodes `find`/`replace` through it, and fails fast with a `badInputError` (→ HTTP 400) if a character can't be represented or the language is unknown — rather than silently returning `X-Replacements: 0`. To add a language: add its byte table (and any code-point overrides) to `encodingTables` in `encoding.go`, and add an `<option>` to the language `<select>` in `static/index.html`.
+
+This still doesn't help with embedded CID/Type0 (subset) fonts — see Limitations.
 
 ## Prerequisites
 
@@ -29,12 +40,18 @@ Editing text inside a PDF is hard because content streams are compressed and spl
 ```
 pdfer/
 ├── go.mod            # module pdfer  (no dependencies)
-├── main.go           # server + PDF engine (~330 lines, stdlib only)
+├── main.go           # HTTP server + PDF parse/rebuild engine (stdlib only)
+├── encoding.go        # rune -> byte tables per language (latin, turkish, ...)
 └── static/
-    └── index.html    # test UI (embedded into the binary via go:embed)
+    └── index.html    # browser UI: PDF.js preview, drag-to-select, zoom, language picker
 ```
 
-## `main.go`
+The files above are the source of truth — read them directly rather than
+relying on inline copies in this document, which go stale as the code
+evolves. The section below is retained for historical/illustrative context
+from the project's initial build and may not reflect the current code.
+
+## `main.go` (original version, see repo for current code)
 
 ```go
 // pdfer - a tiny PDF text-editing server written in Go (stdlib only).
@@ -400,7 +417,7 @@ func main() {
 }
 ```
 
-## `static/index.html`
+## `static/index.html` (original version, see repo for current code — the current UI additionally renders the PDF with PDF.js, supports drag-to-select text with zoom controls, and a language picker)
 
 ```html
 <!DOCTYPE html>
@@ -568,7 +585,7 @@ The server starts on **http://localhost:8080** (override with `PORT=3000 go run 
 |---|---|---|---|
 | `/` | GET | — | Test UI (embedded) |
 | `/api/health` | GET | — | `ok` |
-| `/api/edit` | POST | multipart form: `file` (PDF, max 50 MB), `find` (required), `replace` | Edited PDF bytes; header `X-Replacements: N` |
+| `/api/edit` | POST | multipart form: `file` (PDF, max 50 MB), `find` (required), `replace`, `lang` (optional, default `latin`; see `encoding.go`) | Edited PDF bytes; header `X-Replacements: N` |
 
 Example with curl:
 
@@ -578,13 +595,21 @@ curl -o edited.pdf \
   -F 'find=ACME Corp' \
   -F 'replace=Globex Inc' \
   http://localhost:8080/api/edit
+
+# Turkish text needs the matching language table:
+curl -o edited.pdf \
+  -F file=@rapor.pdf \
+  -F 'find=çalışma' \
+  -F 'replace=ofis' \
+  -F 'lang=turkish' \
+  http://localhost:8080/api/edit
 ```
 
-Errors return plain text with status 400 (bad input) or 422 (PDF could not be processed).
+Errors return plain text with status 400 (bad input — including an unknown `lang` or a `find`/`replace` character unsupported by the selected language) or 422 (PDF could not be processed).
 
 ## Verified behavior
 
-This exact code was built and tested end-to-end:
+This code was built and tested end-to-end:
 
 ```
 $ curl -F file=@test.pdf -F 'find=ACME Corp' -F 'replace=Globex Inc' localhost:8080/api/edit -o edited.pdf
@@ -598,13 +623,22 @@ Page 2: Globex Inc forever.
 
 Replacement text containing `(`, `)`, or `\` is escaped correctly, and multi-page PDFs are handled.
 
+Turkish encoding, verified against a fixture with Windows-1254-encoded content:
+
+```
+$ curl -F file=@test_tr.pdf -F 'find=çalışma' -F 'replace=ofis' -F 'lang=turkish' localhost:8080/api/edit -o edited_tr.pdf
+X-Replacements: 1
+$ qpdf --check edited_tr.pdf   # → no syntax or stream errors
+# content stream, decoded as cp1254: "İstanbul ofis ofisi Ğüzel Şeker"
+```
+
 ## Limitations (honest ones)
 
-- **Subset/CID fonts**: many PDFs (especially from Word or InDesign) embed subset fonts with custom character maps, so text is not stored as readable ASCII — the find text won't match and you'll get `X-Replacements: 0`. Handling this requires decoding each font's CMap; production tools (Apryse, UniPDF, Adobe API) do this.
+- **Subset/CID fonts**: many PDFs (especially from Word or InDesign) embed subset fonts with custom character maps, so text is not stored as bytes matching any known code page — the find text won't match and you'll get `X-Replacements: 0`, or a 400 if a character can't even be represented in the selected language's table. Handling this requires decoding each font's embedded CMap; production tools (Apryse, UniPDF, Adobe API) do this. The `lang` parameter (see `encoding.go`) only helps with simple (non-CID) fonts using a standard single-byte encoding — it does not detect or parse the PDF's actual font `/Encoding`/`/Differences`, it just assumes WinAnsiEncoding (`latin`) or Windows-1254 (`turkish`).
 - **Layout is not reflowed**: replacing "Hello" with a much longer string keeps the original glyph positions, so long replacements can overlap neighboring text.
 - **Text split across operators**: a phrase kerned into pieces like `(AC) -12 (ME)` won't match a search for `ACME`.
 - Scanned/image-only PDFs contain no text at all — you'd need OCR first.
 
 ## Next steps
 
-Ideas to extend: fuzzy matching across split text runs, per-page targeting, regex find, a `/api/extract` endpoint to preview a PDF's actual text before editing, and Docker packaging (`FROM golang` build stage + `FROM debian:slim` with qpdf).
+Ideas to extend: fuzzy matching across split text runs, per-page targeting, regex find, a `/api/extract` endpoint to preview a PDF's actual text before editing, Docker packaging (`FROM golang` build stage + `FROM debian:slim` with qpdf), more `encoding.go` language tables (e.g. Greek/ISO-8859-7, Russian/cp1251), and parsing each font's actual `/Encoding` + `/Differences` array instead of assuming a fixed table per language.

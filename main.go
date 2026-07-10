@@ -15,6 +15,7 @@ package main
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -190,24 +191,9 @@ func parseObjects(pdf []byte) ([]pdfObject, error) {
 // Text replacement
 // ---------------------------------------------------------------------------
 
-// escapePDFString escapes text for use inside a PDF literal string ( ... ).
-func escapePDFString(s string) []byte {
-	var b bytes.Buffer
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '\\', '(', ')':
-			b.WriteByte('\\')
-		}
-		b.WriteByte(s[i])
-	}
-	return b.Bytes()
-}
-
 // replaceInStreams edits every non-image stream in place.
 // Returns the number of replacements performed.
-func replaceInStreams(objects []pdfObject, find, repl string) int {
-	oldB := escapePDFString(find)
-	newB := escapePDFString(repl)
+func replaceInStreams(objects []pdfObject, oldB, newB []byte) int {
 	total := 0
 	for i := range objects {
 		o := &objects[i]
@@ -275,8 +261,27 @@ func rebuild(objects []pdfObject, original []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
+// badInputError marks errors caused by the caller's input (language,
+// find/replace text) rather than by PDF parsing/rebuilding.
+type badInputError struct{ msg string }
+
+func (e *badInputError) Error() string { return e.msg }
+
 // EditPDF is the full pipeline: normalize -> replace -> rebuild -> recompress.
-func EditPDF(pdf []byte, find, repl string) ([]byte, int, error) {
+func EditPDF(pdf []byte, find, repl, lang string) ([]byte, int, error) {
+	table, ok := encodingTables[lang]
+	if !ok {
+		return nil, 0, &badInputError{fmt.Sprintf("unsupported language %q", lang)}
+	}
+	findB, ok := encodeAndEscape(find, table)
+	if !ok {
+		return nil, 0, &badInputError{fmt.Sprintf("find text contains a character not supported by the %q language encoding", lang)}
+	}
+	replB, ok := encodeAndEscape(repl, table)
+	if !ok {
+		return nil, 0, &badInputError{fmt.Sprintf("replace text contains a character not supported by the %q language encoding", lang)}
+	}
+
 	norm, err := normalize(pdf)
 	if err != nil {
 		return nil, 0, fmt.Errorf("normalize: %w", err)
@@ -285,7 +290,7 @@ func EditPDF(pdf []byte, find, repl string) ([]byte, int, error) {
 	if err != nil {
 		return nil, 0, fmt.Errorf("parse: %w", err)
 	}
-	count := replaceInStreams(objects, find, repl)
+	count := replaceInStreams(objects, findB, replB)
 	rebuilt, err := rebuild(objects, norm)
 	if err != nil {
 		return nil, 0, fmt.Errorf("rebuild: %w", err)
@@ -313,6 +318,10 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `"find" text is required`, http.StatusBadRequest)
 		return
 	}
+	lang := r.FormValue("lang")
+	if lang == "" {
+		lang = "latin"
+	}
 	file, hdr, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "missing file field", http.StatusBadRequest)
@@ -325,8 +334,13 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	edited, count, err := EditPDF(pdf, find, repl)
+	edited, count, err := EditPDF(pdf, find, repl, lang)
 	if err != nil {
+		var bad *badInputError
+		if errors.As(err, &bad) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		log.Printf("edit failed for %q: %v", hdr.Filename, err)
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return

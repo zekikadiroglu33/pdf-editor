@@ -65,6 +65,11 @@
     border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 15px;
   }
   input[type=text]:focus { outline: none; border-color: var(--accent); }
+  select {
+    width: 100%; padding: 11px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 15px;
+  }
+  select:focus { outline: none; border-color: var(--accent); }
   button {
     margin-top: 22px; width: 100%; padding: 13px; border: none; border-radius: 8px;
     background: var(--accent); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
@@ -99,6 +104,12 @@
       <button type="button" id="zoomIn">+ Zoom in</button>
     </div>
     <div class="viewer" id="viewer"></div>
+
+    <label for="lang">Language</label>
+    <select id="lang">
+      <option value="latin">Latin / English (default)</option>
+      <option value="turkish">Turkish</option>
+    </select>
 
     <label for="find">Find text</label>
     <input type="text" id="find" placeholder="e.g. ACME Corp">
@@ -237,6 +248,7 @@
     form.append('file', pdfFile);
     form.append('find', find);
     form.append('replace', document.getElementById('replace').value);
+    form.append('lang', document.getElementById('lang').value);
 
     go.disabled = true;
     setStatus('Editing…');
