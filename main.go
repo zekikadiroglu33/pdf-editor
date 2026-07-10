@@ -188,31 +188,6 @@ func parseObjects(pdf []byte) ([]pdfObject, error) {
 }
 
 // ---------------------------------------------------------------------------
-// Text replacement
-// ---------------------------------------------------------------------------
-
-// replaceInStreams edits every non-image stream in place.
-// Returns the number of replacements performed.
-func replaceInStreams(objects []pdfObject, oldB, newB []byte) int {
-	total := 0
-	for i := range objects {
-		o := &objects[i]
-		if !o.hasStream || bytes.Contains(o.body, []byte("/Image")) {
-			continue
-		}
-		n := bytes.Count(o.stream, oldB)
-		if n == 0 {
-			continue
-		}
-		o.stream = bytes.ReplaceAll(o.stream, oldB, newB)
-		o.body = lengthRe.ReplaceAll(o.body,
-			[]byte(fmt.Sprintf("/Length %d", len(o.stream))))
-		total += n
-	}
-	return total
-}
-
-// ---------------------------------------------------------------------------
 // Serialization: rebuild the PDF with a fresh xref table
 // ---------------------------------------------------------------------------
 
@@ -268,19 +243,20 @@ type badInputError struct{ msg string }
 func (e *badInputError) Error() string { return e.msg }
 
 // EditPDF is the full pipeline: normalize -> replace -> rebuild -> recompress.
+//
+// Replace is font-aware (see pdftext.go): it walks each page's actual
+// fonts (including CID/Identity-H fonts via their /ToUnicode CMap) to
+// reconstruct the real Unicode text before matching, so find/replace works
+// regardless of which font rendered which character. Replacement text that
+// the original font can't render is routed through a bundled fallback font.
 func EditPDF(pdf []byte, find, repl, lang string) ([]byte, int, error) {
-	table, ok := encodingTables[lang]
+	simpleTable, ok := encodingTables[lang]
 	if !ok {
 		return nil, 0, &badInputError{fmt.Sprintf("unsupported language %q", lang)}
 	}
-	findB, ok := encodeAndEscape(find, table)
-	if !ok {
-		return nil, 0, &badInputError{fmt.Sprintf("find text contains a character not supported by the %q language encoding", lang)}
-	}
-	replB, ok := encodeAndEscape(repl, table)
-	if !ok {
-		return nil, 0, &badInputError{fmt.Sprintf("replace text contains a character not supported by the %q language encoding", lang)}
-	}
+	fallbackTable := encodingTables["turkish"] // superset covering latin + Turkish; used for the bundled fallback font
+	findRunes := []rune(find)
+	replRunes := []rune(repl)
 
 	norm, err := normalize(pdf)
 	if err != nil {
@@ -290,12 +266,65 @@ func EditPDF(pdf []byte, find, repl, lang string) ([]byte, int, error) {
 	if err != nil {
 		return nil, 0, fmt.Errorf("parse: %w", err)
 	}
-	count := replaceInStreams(objects, findB, replB)
+
+	objByNum := make(map[int]int, len(objects))
+	maxNum := 0
+	for idx, o := range objects {
+		objByNum[o.num] = idx
+		if o.num > maxNum {
+			maxNum = o.num
+		}
+	}
+
+	fontCache := map[int]*resolvedFont{}
+	type fbTarget struct{ ownerIdx, start, end int }
+	var fbTargets []fbTarget
+	seenOwner := map[int]bool{}
+	needFallback := false
+	totalCount := 0
+
+	for pageIdx := range objects {
+		if !isPageObject(objects[pageIdx].body) {
+			continue
+		}
+		var fontMap map[string]*resolvedFont
+		ownerIdx, fStart, fEnd, ok := resolvePageFontDict(objects, objByNum, pageIdx)
+		if ok {
+			fontMap = buildFontMap(objects[ownerIdx].body[fStart:fEnd], objects, objByNum, fontCache, lang)
+		}
+		for _, cIdx := range resolvePageContents(objects, objByNum, pageIdx) {
+			dr := decodeContentStream(tokenizeContentStream(objects[cIdx].stream), fontMap)
+			newStream, n, usesFallback := replaceInDecodedStream(objects[cIdx].stream, dr, findRunes, replRunes, simpleTable, fallbackTable)
+			if n == 0 {
+				continue
+			}
+			objects[cIdx].stream = newStream
+			objects[cIdx].body = lengthRe.ReplaceAll(objects[cIdx].body,
+				[]byte(fmt.Sprintf("/Length %d", len(newStream))))
+			totalCount += n
+			if usesFallback {
+				needFallback = true
+				if ok && !seenOwner[ownerIdx] {
+					seenOwner[ownerIdx] = true
+					fbTargets = append(fbTargets, fbTarget{ownerIdx, fStart, fEnd})
+				}
+			}
+		}
+	}
+
+	if needFallback {
+		newObjs, fontObjNum := buildFallbackFontObjects(maxNum + 1)
+		objects = append(objects, newObjs...)
+		for _, t := range fbTargets {
+			insertFontEntry(&objects[t.ownerIdx], t.start, t.end, fallbackFontResourceName, fontObjNum)
+		}
+	}
+
 	rebuilt, err := rebuild(objects, norm)
 	if err != nil {
 		return nil, 0, fmt.Errorf("rebuild: %w", err)
 	}
-	return recompress(rebuilt), count, nil
+	return recompress(rebuilt), totalCount, nil
 }
 
 // ---------------------------------------------------------------------------

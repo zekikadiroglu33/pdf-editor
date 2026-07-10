@@ -34,25 +34,57 @@ var turkishOverrides = map[byte]rune{
 	0xF0: 'ğ', 0xFD: 'ı', 0xFE: 'ş',
 }
 
+// turkishSpecialRunes are the six Turkish letters with no representation in
+// standard WinAnsiEncoding at all. A PDF's original font almost always
+// declares plain /WinAnsiEncoding (pdfer doesn't parse /Differences), so
+// reusing it to encode one of these runes would silently render the wrong
+// (Icelandic) glyph. Text needing any of these must go through pdfer's
+// bundled fallback font instead (see pdftext.go's reroute decision).
+var turkishSpecialRunes = map[rune]bool{}
+
+func init() {
+	for _, r := range turkishOverrides {
+		turkishSpecialRunes[r] = true
+	}
+}
+
+func needsTurkishSpecial(runes []rune) bool {
+	for _, r := range runes {
+		if turkishSpecialRunes[r] {
+			return true
+		}
+	}
+	return false
+}
+
 // buildTable returns a rune -> byte map for a single-byte, Latin-1-based
 // Windows code page, with the given code points overridden.
 func buildTable(overrides map[byte]rune) map[rune]byte {
-	table := make(map[rune]byte, 256)
+	// Resolve the byte -> rune assignment first, so an override cleanly
+	// replaces the base rune at that byte instead of leaving both the old
+	// and new rune mapped to it (which would make the reverse, byte->rune
+	// decoding table built in init() ambiguous/nondeterministic).
+	var byteRune [256]rune
 	for b := 0; b < 0x80; b++ {
-		table[rune(b)] = byte(b)
+		byteRune[b] = rune(b)
 	}
 	for b := 0x80; b < 0xA0; b++ {
 		r := rune(b)
 		if special, ok := cp1252SpecialUpper[byte(b)]; ok {
 			r = special
 		}
-		table[r] = byte(b)
+		byteRune[b] = r
 	}
 	for b := 0xA0; b <= 0xFF; b++ {
-		table[rune(b)] = byte(b)
+		byteRune[b] = rune(b)
 	}
 	for b, r := range overrides {
-		table[r] = b
+		byteRune[b] = r
+	}
+
+	table := make(map[rune]byte, 256)
+	for b, r := range byteRune {
+		table[r] = byte(b)
 	}
 	return table
 }
@@ -61,6 +93,21 @@ func buildTable(overrides map[byte]rune) map[rune]byte {
 var encodingTables = map[string]map[rune]byte{
 	"latin":   buildTable(nil),
 	"turkish": buildTable(turkishOverrides),
+}
+
+// decodingTables are the byte -> rune inverses of encodingTables, used to
+// decode existing simple-font PDF content-stream bytes back into Unicode
+// for matching (see pdftext.go).
+var decodingTables = map[string]map[byte]rune{}
+
+func init() {
+	for lang, enc := range encodingTables {
+		dec := make(map[byte]rune, len(enc))
+		for r, b := range enc {
+			dec[b] = r
+		}
+		decodingTables[lang] = dec
+	}
 }
 
 // encodeAndEscape transcodes s into the given single-byte table and escapes
