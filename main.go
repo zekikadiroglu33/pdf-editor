@@ -249,7 +249,16 @@ func (e *badInputError) Error() string { return e.msg }
 // reconstruct the real Unicode text before matching, so find/replace works
 // regardless of which font rendered which character. Replacement text that
 // the original font can't render is routed through a bundled fallback font.
-func EditPDF(pdf []byte, find, repl, lang string) ([]byte, int, error) {
+//
+// targetPage/targetOccurrence optionally restrict the edit to a single
+// occurrence: targetPage <= 0 means "every page" (legacy replace-all
+// behavior); targetPage > 0 with targetOccurrence < 0 means "every match on
+// that page"; targetPage > 0 with targetOccurrence >= 0 means "only the
+// Nth match (0-indexed, in reading order) on that page" - this is what the
+// UI uses when the user selects a specific word with the mouse, so that
+// selecting one occurrence doesn't rewrite every other occurrence of the
+// same word throughout the document.
+func EditPDF(pdf []byte, find, repl, lang string, targetPage, targetOccurrence int) ([]byte, int, error) {
 	simpleTable, ok := encodingTables[lang]
 	if !ok {
 		return nil, 0, &badInputError{fmt.Sprintf("unsupported language %q", lang)}
@@ -276,6 +285,19 @@ func EditPDF(pdf []byte, find, repl, lang string) ([]byte, int, error) {
 		}
 	}
 
+	pageOrder := resolvePageOrder(objects, objByNum)
+	if len(pageOrder) == 0 {
+		// Page tree couldn't be resolved (unusual/malformed PDF) - fall
+		// back to physical object order. Page-number targeting becomes
+		// best-effort in that case, but whole-document replace-all is
+		// unaffected since it doesn't care about page order.
+		for idx, o := range objects {
+			if isPageObject(o.body) {
+				pageOrder = append(pageOrder, idx)
+			}
+		}
+	}
+
 	fontCache := map[int]*resolvedFont{}
 	type fbTarget struct{ ownerIdx, start, end int }
 	var fbTargets []fbTarget
@@ -283,30 +305,47 @@ func EditPDF(pdf []byte, find, repl, lang string) ([]byte, int, error) {
 	needFallback := false
 	totalCount := 0
 
-	for pageIdx := range objects {
-		if !isPageObject(objects[pageIdx].body) {
+	for pn, pageIdx := range pageOrder {
+		pageNum := pn + 1
+		if targetPage > 0 && pageNum != targetPage {
 			continue
 		}
-		var fontMap map[string]*resolvedFont
-		ownerIdx, fStart, fEnd, ok := resolvePageFontDict(objects, objByNum, pageIdx)
-		if ok {
-			fontMap = buildFontMap(objects[ownerIdx].body[fStart:fEnd], objects, objByNum, fontCache, lang)
+		var occFilter *occurrenceFilter
+		if targetPage > 0 && targetOccurrence >= 0 {
+			occFilter = &occurrenceFilter{target: targetOccurrence}
 		}
+
+		var rootScope resScope
+		if resOwner, rStart, rEnd, rOk := resolvePageResources(objects, objByNum, pageIdx); rOk {
+			rootScope = resolveScope(objects, objByNum, fontCache, lang, resOwner, rStart, rEnd)
+		}
+
+		// Expand the page's own /Contents into every text-bearing stream
+		// reachable from it, including any Form XObjects it invokes via
+		// "Do" (and Forms those invoke, recursively) - some PDF generators
+		// (e.g. iText) put all of a page's real content inside a Form
+		// XObject rather than directly in /Contents.
+		var units []formContentUnit
+		visiting := map[int]bool{}
 		for _, cIdx := range resolvePageContents(objects, objByNum, pageIdx) {
-			dr := decodeContentStream(tokenizeContentStream(objects[cIdx].stream), fontMap)
-			newStream, n, usesFallback := replaceInDecodedStream(objects[cIdx].stream, dr, findRunes, replRunes, simpleTable, fallbackTable)
+			walkContent(objects, objByNum, fontCache, lang, cIdx, rootScope, 0, visiting, &units)
+		}
+
+		for _, u := range units {
+			dr := decodeContentStream(tokenizeContentStream(objects[u.streamIdx].stream), u.scope.fontMap)
+			newStream, n, usesFallback := replaceInDecodedStream(objects[u.streamIdx].stream, dr, findRunes, replRunes, simpleTable, fallbackTable, occFilter)
 			if n == 0 {
 				continue
 			}
-			objects[cIdx].stream = newStream
-			objects[cIdx].body = lengthRe.ReplaceAll(objects[cIdx].body,
+			objects[u.streamIdx].stream = newStream
+			objects[u.streamIdx].body = lengthRe.ReplaceAll(objects[u.streamIdx].body,
 				[]byte(fmt.Sprintf("/Length %d", len(newStream))))
 			totalCount += n
 			if usesFallback {
 				needFallback = true
-				if ok && !seenOwner[ownerIdx] {
-					seenOwner[ownerIdx] = true
-					fbTargets = append(fbTargets, fbTarget{ownerIdx, fStart, fEnd})
+				if u.scope.fontOk && !seenOwner[u.scope.fontOwnerIdx] {
+					seenOwner[u.scope.fontOwnerIdx] = true
+					fbTargets = append(fbTargets, fbTarget{u.scope.fontOwnerIdx, u.scope.fStart, u.scope.fEnd})
 				}
 			}
 		}
@@ -351,6 +390,22 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 	if lang == "" {
 		lang = "latin"
 	}
+	// page/occurrence are optional: when the UI's selection tracking
+	// supplies them, only that one occurrence (Nth match, 0-indexed, on
+	// that 1-indexed page) is edited instead of every match in the
+	// document - see EditPDF.
+	page := 0
+	if v := r.FormValue("page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			page = n
+		}
+	}
+	occurrence := -1
+	if v := r.FormValue("occurrence"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			occurrence = n
+		}
+	}
 	file, hdr, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "missing file field", http.StatusBadRequest)
@@ -363,7 +418,7 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	edited, count, err := EditPDF(pdf, find, repl, lang)
+	edited, count, err := EditPDF(pdf, find, repl, lang, page, occurrence)
 	if err != nil {
 		var bad *badInputError
 		if errors.As(err, &bad) {

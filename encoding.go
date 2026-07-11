@@ -110,16 +110,29 @@ func init() {
 	}
 }
 
-// encodeAndEscape transcodes s into the given single-byte table and escapes
-// it for use inside a PDF literal string ( ... ). ok is false if s contains
-// a character the table cannot represent.
-func encodeAndEscape(s string, table map[rune]byte) (out []byte, ok bool) {
-	var buf []byte
+// encodeRaw transcodes s into the given single-byte table, unescaped. ok is
+// false if s contains a character the table cannot represent.
+func encodeRaw(s string, table map[rune]byte) (out []byte, ok bool) {
 	for _, r := range s {
 		b, found := table[r]
 		if !found {
 			return nil, false
 		}
+		out = append(out, b)
+	}
+	return out, true
+}
+
+// encodeAndEscape transcodes s into the given single-byte table and escapes
+// it for use inside a PDF literal string ( ... ). ok is false if s contains
+// a character the table cannot represent.
+func encodeAndEscape(s string, table map[rune]byte) (out []byte, ok bool) {
+	raw, ok := encodeRaw(s, table)
+	if !ok {
+		return nil, false
+	}
+	var buf []byte
+	for _, b := range raw {
 		if b == '\\' || b == '(' || b == ')' {
 			buf = append(buf, '\\')
 		}
