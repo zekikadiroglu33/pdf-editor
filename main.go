@@ -435,7 +435,7 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "find/replace text too long", http.StatusBadRequest)
 		return
 	}
-	file, hdr, err := r.FormFile("file")
+	file, _, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "missing file field", http.StatusBadRequest)
 		return
@@ -456,12 +456,11 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Printf("edit failed for %q: %v", hdr.Filename, err)
+		log.Printf("edit failed (%d byte upload): %v", len(pdf), err)
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	log.Printf("edited %q: %d replacement(s), %d -> %d bytes",
-		hdr.Filename, count, len(pdf), len(edited))
+	log.Printf("edited: %d replacement(s), %d -> %d bytes", count, len(pdf), len(edited))
 
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("X-Replacements", strconv.Itoa(count))
