@@ -1,0 +1,6 @@
+pdfer
+*.pdf
+.DS_Store
+/tmp/
+/.claude
+.claude

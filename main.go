@@ -14,6 +14,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -23,9 +24,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"regexp"
 	"sort"
 	"strconv"
+	"syscall"
+	"time"
 )
 
 //go:embed static
@@ -33,11 +37,29 @@ var staticFS embed.FS
 
 const maxUpload = 50 << 20 // 50 MB
 
+// maxFieldLen caps the find/replace text fields. maxUpload already bounds
+// the whole request body, but this keeps a single request from spending
+// its entire budget on megabytes of find/replace text instead of a PDF.
+const maxFieldLen = 10000
+
+// qpdfTimeout bounds each qpdf subprocess call. Without this, a malicious
+// or pathologically malformed upload could hang a worker (and the
+// concurrency slot it holds, see middleware.go) indefinitely.
+const qpdfTimeout = 25 * time.Second
+
+// editTimeout bounds the whole /api/edit pipeline (two qpdf calls plus our
+// own in-process parsing/rebuilding), so one request can't tie up a
+// concurrency slot indefinitely even if something downstream misbehaves.
+const editTimeout = 55 * time.Second
+
 // ---------------------------------------------------------------------------
 // qpdf helpers
 // ---------------------------------------------------------------------------
 
-func runQpdf(input []byte, args ...string) ([]byte, error) {
+func runQpdf(ctx context.Context, input []byte, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, qpdfTimeout)
+	defer cancel()
+
 	in, err := os.CreateTemp("", "pdfer-in-*.pdf")
 	if err != nil {
 		return nil, err
@@ -56,10 +78,13 @@ func runQpdf(input []byte, args ...string) ([]byte, error) {
 	in.Close()
 
 	full := append(args, in.Name(), out.Name())
-	cmd := exec.Command("qpdf", full...)
+	cmd := exec.CommandContext(ctx, "qpdf", full...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("qpdf: timed out after %s", qpdfTimeout)
+		}
 		// exit code 3 == "succeeded with warnings" - acceptable
 		if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 3 {
 			return nil, fmt.Errorf("qpdf: %v: %s", err, stderr.String())
@@ -70,13 +95,13 @@ func runQpdf(input []byte, args ...string) ([]byte, error) {
 
 // normalize turns any PDF into a classic PDF with uncompressed,
 // text-searchable content streams and no object streams.
-func normalize(pdf []byte) ([]byte, error) {
-	return runQpdf(pdf, "--object-streams=disable", "--stream-data=uncompress")
+func normalize(ctx context.Context, pdf []byte) ([]byte, error) {
+	return runQpdf(ctx, pdf, "--object-streams=disable", "--stream-data=uncompress")
 }
 
 // recompress shrinks the rebuilt file back down.
-func recompress(pdf []byte) []byte {
-	out, err := runQpdf(pdf, "--object-streams=generate")
+func recompress(ctx context.Context, pdf []byte) []byte {
+	out, err := runQpdf(ctx, pdf, "--object-streams=generate")
 	if err != nil {
 		return pdf // uncompressed output is still a valid PDF
 	}
@@ -258,7 +283,7 @@ func (e *badInputError) Error() string { return e.msg }
 // UI uses when the user selects a specific word with the mouse, so that
 // selecting one occurrence doesn't rewrite every other occurrence of the
 // same word throughout the document.
-func EditPDF(pdf []byte, find, repl, lang string, targetPage, targetOccurrence int) ([]byte, int, error) {
+func EditPDF(ctx context.Context, pdf []byte, find, repl, lang string, targetPage, targetOccurrence int) ([]byte, int, error) {
 	simpleTable, ok := encodingTables[lang]
 	if !ok {
 		return nil, 0, &badInputError{fmt.Sprintf("unsupported language %q", lang)}
@@ -267,7 +292,7 @@ func EditPDF(pdf []byte, find, repl, lang string, targetPage, targetOccurrence i
 	findRunes := []rune(find)
 	replRunes := []rune(repl)
 
-	norm, err := normalize(pdf)
+	norm, err := normalize(ctx, pdf)
 	if err != nil {
 		return nil, 0, fmt.Errorf("normalize: %w", err)
 	}
@@ -363,7 +388,7 @@ func EditPDF(pdf []byte, find, repl, lang string, targetPage, targetOccurrence i
 	if err != nil {
 		return nil, 0, fmt.Errorf("rebuild: %w", err)
 	}
-	return recompress(rebuilt), totalCount, nil
+	return recompress(ctx, rebuilt), totalCount, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -406,6 +431,10 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 			occurrence = n
 		}
 	}
+	if len(find) > maxFieldLen || len(repl) > maxFieldLen {
+		http.Error(w, "find/replace text too long", http.StatusBadRequest)
+		return
+	}
 	file, hdr, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "missing file field", http.StatusBadRequest)
@@ -418,7 +447,9 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	edited, count, err := EditPDF(pdf, find, repl, lang, page, occurrence)
+	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
+	defer cancel()
+	edited, count, err := EditPDF(ctx, pdf, find, repl, lang, page, occurrence)
 	if err != nil {
 		var bad *badInputError
 		if errors.As(err, &bad) {
@@ -444,16 +475,53 @@ func main() {
 	}
 
 	static, _ := fs.Sub(staticFS, "static")
-	http.Handle("/", http.FileServer(http.FS(static)))
-	http.HandleFunc("/api/edit", handleEdit)
-	http.HandleFunc("/api/health", func(w http.ResponseWriter, _ *http.Request) {
+
+	// /api/edit is the expensive, abuse-prone route: rate-limited per IP
+	// and concurrency-limited process-wide, since each call spawns two
+	// qpdf subprocesses. The static file server and /api/health stay
+	// unrestricted.
+	editLimiter := newConcurrencyLimiter(8)
+	rateLimiter := newRateLimiter(0.5, 15) // ~1 edit/2s sustained, burst 15, per IP
+	editHandler := editLimiter.middleware(rateLimitMiddleware(rateLimiter, http.HandlerFunc(handleEdit)))
+
+	mux := http.NewServeMux()
+	mux.Handle("/", http.FileServer(http.FS(static)))
+	mux.Handle("/api/edit", editHandler)
+	mux.HandleFunc("/api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte("ok"))
 	})
+
+	handler := securityHeadersMiddleware(loggingMiddleware(recoverMiddleware(mux)))
 
 	addr := ":8080"
 	if p := os.Getenv("PORT"); p != "" {
 		addr = ":" + p
 	}
-	log.Printf("pdfer listening on http://localhost%s", addr)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	go func() {
+		log.Printf("pdfer listening on http://localhost%s", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+	stop()
+	log.Print("shutting down: waiting for in-flight requests to finish...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown did not complete cleanly: %v", err)
+	}
 }
