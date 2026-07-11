@@ -59,6 +59,16 @@ docker run --rm -p 8080:8080 pdfer
 
 The image is a multi-stage build (Go build stage + a `debian:bookworm-slim` runtime with `qpdf` installed), runs as a non-root user, and exposes `/api/health` as its `HEALTHCHECK`. Override the port with `-e PORT=3000 -p 3000:3000`.
 
+### Deploying on a VPS (Caddy + automatic HTTPS)
+
+`docker-compose.yml` + `Caddyfile` bundle the app with [Caddy](https://caddyserver.com) as a reverse proxy, which gets you free, automatic HTTPS (Let's Encrypt) with no manual certificate handling. `pdfer` itself is not published to the host — only Caddy is reachable from outside, on 80/443.
+
+1. Point a DNS A/AAAA record for your domain at the server's IP.
+2. `cp .env.example .env` and set `DOMAIN=your-domain.com`.
+3. `docker compose up -d --build`
+
+Caddy issues and renews the certificate automatically on first request. Logs: `docker compose logs -f`.
+
 ### Production hardening
 
 The server is meant to be safe to expose directly to the public internet with no authentication in front of it:
@@ -68,6 +78,14 @@ The server is meant to be safe to expose directly to the public internet with no
 - Panic recovery, structured request logging, and graceful shutdown on `SIGTERM`.
 - Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js is self-hosted under `static/vendor/`) plus standard security headers.
 - TLS is expected to be terminated in front of the app (reverse proxy / platform load balancer) — the binary itself serves plain HTTP.
+
+### Sizing
+
+Measured with a synthetic ~46 MB PDF (near the 50 MB upload cap): a single edit peaks around **400 MB** RSS (`pdfer` + its two sequential `qpdf` subprocesses) and takes ~5-6s. Eight concurrent worst-case-sized edits (the default concurrency cap) peaked around **1.5 GB** combined RSS with no failures or timeouts, just slower per-request latency under CPU contention (timeouts have comfortable headroom even then). Real-world documents are almost always far smaller than 46 MB, so this is a deliberately pessimistic ceiling, not the expected case.
+
+- **Memory**: 2 GB minimum, 4 GB recommended for headroom.
+- **CPU**: 2 vCPUs minimum; more improves worst-case latency under concurrent large uploads, not correctness.
+- Running on a 1 GB or smaller instance: lower the concurrency limit in `main.go` (`newConcurrencyLimiter(8)`) to something like 3-4 to stay inside that budget.
 
 ## API reference
 
@@ -127,6 +145,9 @@ pdf-editor/
 ├── fallbackfont_data.go      # generated widths/metrics for the fallback font
 ├── pdfer_test.go             # regression tests (programmatically-built fixture PDFs)
 ├── Dockerfile
+├── docker-compose.yml         # pdfer + Caddy (reverse proxy, automatic HTTPS) for VPS deploys
+├── Caddyfile
+├── .env.example
 ├── assets/
 │   └── pdfer-fallback.ttf   # subsetted DejaVu Sans, embedded for fallback rendering
 └── static/

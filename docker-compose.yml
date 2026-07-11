@@ -1,0 +1,28 @@
+services:
+  pdfer:
+    build: .
+    restart: unless-stopped
+    expose:
+      - "8080"
+    # No "ports:" here on purpose - only Caddy is reachable from outside
+    # the host; pdfer is only reachable from Caddy, over this compose
+    # network.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - pdfer
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?set DOMAIN in .env - see .env.example}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

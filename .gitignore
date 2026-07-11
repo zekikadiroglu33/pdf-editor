@@ -4,3 +4,4 @@ pdfer
 /tmp/
 /.claude
 .claude
+.env
