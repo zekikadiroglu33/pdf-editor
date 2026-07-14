@@ -17,6 +17,8 @@ const regexCheckbox = document.getElementById('regex');
 const confirmRow = document.getElementById('confirmRow');
 const confirmBtn = document.getElementById('confirmBtn');
 const pendingCount = document.getElementById('pendingCount');
+const emptyPreview = document.getElementById('emptyPreview');
+const themeToggle = document.getElementById('themeToggle');
 const MIN_SCALE = 0.5, MAX_SCALE = 5, ZOOM_STEP = 0.25;
 const MAX_HISTORY = 5; // capped so undo can't grow unbounded memory on large PDFs
 let pdfFile = null;
@@ -32,6 +34,27 @@ let historyStack = [];
 // page it landed on, or 0 for "anywhere") purely so the preview can
 // highlight it for review - it's never sent to the server.
 let sessionEdits = [];
+
+// Theme: defaults to the OS preference (handled entirely in CSS via
+// prefers-color-scheme), with an explicit override stored in localStorage
+// once the user clicks the toggle - the override always wins over the OS
+// setting on every future load, in either direction.
+const THEME_KEY = 'pdfer-theme';
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+  themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+}
+(function initTheme() {
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored === 'light' || stored === 'dark') { applyTheme(stored); return; }
+  applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+})();
+themeToggle.addEventListener('click', () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
 
 function updateUndoButton() {
   undoBtn.disabled = historyStack.length === 0;
@@ -259,8 +282,20 @@ const setFile = (f, keepZoom = false) => {
     updateUndoButton();
   }
   updateConfirmUI(); // also hides the (now stale) #result panel
-  drop.textContent = `📄 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  emptyPreview.style.display = 'none';
+
+  // Built via DOM methods (not innerHTML) so an unusual filename can't be
+  // interpreted as markup.
+  drop.innerHTML = '';
+  const icon = document.createElement('span');
+  icon.className = 'drop-icon';
+  icon.textContent = '📄';
+  const text = document.createElement('span');
+  text.className = 'drop-text';
+  text.textContent = `${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  drop.append(icon, text);
   drop.classList.add('hasfile');
+
   go.disabled = false;
   setStatus('');
   renderPreview(f, keepZoom);

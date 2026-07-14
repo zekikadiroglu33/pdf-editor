@@ -1,3 +1,5 @@
+<p align="center"><img src="static/logo.svg" width="64" height="64" alt="pdfer logo"></p>
+
 # pdfer — PDF Text Editor
 
 A small, self-contained web service that edits text inside PDF files: upload a PDF, select or type the text to find, type its replacement, and download the edited PDF. Includes a browser UI with a PDF.js-powered preview — drag-select text directly on the rendered page instead of retyping it.

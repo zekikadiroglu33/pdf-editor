@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" role="img" aria-label="pdfer logo">
+  <rect x="0" y="0" width="40" height="40" rx="10" fill="#3b6fe0"/>
+  <path d="M11 9a2 2 0 0 1 2-2h9l7 7v17a2 2 0 0 1-2 2H13a2 2 0 0 1-2-2z" fill="#ffffff"/>
+  <path d="M22 7l7 7h-5a2 2 0 0 1-2-2z" fill="#c9d9fb"/>
+  <rect x="14.5" y="18" width="11" height="2.4" rx="1.2" fill="#c9d9fb"/>
+  <rect x="14.5" y="22.4" width="11" height="2.4" rx="1.2" fill="#ffc400"/>
+  <rect x="14.5" y="26.8" width="7" height="2.4" rx="1.2" fill="#c9d9fb"/>
+</svg>
