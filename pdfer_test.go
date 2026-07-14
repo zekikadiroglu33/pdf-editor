@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -80,8 +81,13 @@ func simplePagePDF(content string, extra ...testObj) []byte {
 
 func mustEditPDF(t *testing.T, pdf []byte, find, repl, lang string, page, occurrence int) (out []byte, count int) {
 	t.Helper()
+	return mustEditPDFRegex(t, pdf, find, repl, lang, page, occurrence, false)
+}
+
+func mustEditPDFRegex(t *testing.T, pdf []byte, find, repl, lang string, page, occurrence int, useRegex bool) (out []byte, count int) {
+	t.Helper()
 	requireQpdf(t)
-	out, count, err := EditPDF(context.Background(), pdf, find, repl, lang, page, occurrence)
+	out, count, err := EditPDF(context.Background(), pdf, find, repl, lang, page, occurrence, useRegex)
 	if err != nil {
 		t.Fatalf("EditPDF(%q -> %q): %v", find, repl, err)
 	}
@@ -165,6 +171,35 @@ func TestOccurrenceTargeting(t *testing.T) {
 	}
 	if !strings.Contains(text, "GLOBEX second") {
 		t.Errorf("expected second occurrence replaced, got %q", text)
+	}
+}
+
+// --- Regex find/replace -------------------------------------------------
+
+func TestRegexReplaceWithCaptureGroups(t *testing.T) {
+	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td (Invoice 2024-001) Tj ET\n" +
+		"BT /F1 24 Tf 50 650 Td (Invoice 2024-002) Tj ET\n")
+
+	out, count := mustEditPDFRegex(t, pdf, `Invoice (\d+)-(\d+)`, "INV-$2/$1", "latin", 0, -1, true)
+	if count != 2 {
+		t.Fatalf("want 2 replacements, got %d", count)
+	}
+	text := extractText(t, out)
+	if !strings.Contains(text, "INV-001/2024") || !strings.Contains(text, "INV-002/2024") {
+		t.Errorf("expected capture groups expanded in both matches, got %q", text)
+	}
+}
+
+func TestInvalidRegexReturnsBadInput(t *testing.T) {
+	requireQpdf(t)
+	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td (Hello World) Tj ET\n")
+	_, _, err := EditPDF(context.Background(), pdf, "(unclosed", "x", "latin", 0, -1, true)
+	if err == nil {
+		t.Fatal("expected an error for an invalid regex, got nil")
+	}
+	var bad *badInputError
+	if !errors.As(err, &bad) {
+		t.Fatalf("expected a badInputError, got %T: %v", err, err)
 	}
 }
 

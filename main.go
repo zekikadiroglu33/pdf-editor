@@ -283,14 +283,21 @@ func (e *badInputError) Error() string { return e.msg }
 // UI uses when the user selects a specific word with the mouse, so that
 // selecting one occurrence doesn't rewrite every other occurrence of the
 // same word throughout the document.
-func EditPDF(ctx context.Context, pdf []byte, find, repl, lang string, targetPage, targetOccurrence int) ([]byte, int, error) {
+//
+// useRegex treats find as a Go regexp (RE2, so it's immune to catastrophic
+// backtracking regardless of what pattern is submitted) matched against the
+// document's actual decoded Unicode text; repl is then expanded per match
+// using regexp.Expand syntax ($1, ${name}, ...) instead of used verbatim.
+func EditPDF(ctx context.Context, pdf []byte, find, repl, lang string, targetPage, targetOccurrence int, useRegex bool) ([]byte, int, error) {
 	simpleTable, ok := encodingTables[lang]
 	if !ok {
 		return nil, 0, &badInputError{fmt.Sprintf("unsupported language %q", lang)}
 	}
 	fallbackTable := encodingTables["turkish"] // superset covering latin + Turkish; used for the bundled fallback font
-	findRunes := []rune(find)
-	replRunes := []rune(repl)
+	matcher, err := newTextMatcher(find, repl, useRegex)
+	if err != nil {
+		return nil, 0, &badInputError{err.Error()}
+	}
 
 	norm, err := normalize(ctx, pdf)
 	if err != nil {
@@ -358,7 +365,7 @@ func EditPDF(ctx context.Context, pdf []byte, find, repl, lang string, targetPag
 
 		for _, u := range units {
 			dr := decodeContentStream(tokenizeContentStream(objects[u.streamIdx].stream), u.scope.fontMap)
-			newStream, n, usesFallback := replaceInDecodedStream(objects[u.streamIdx].stream, dr, findRunes, replRunes, simpleTable, fallbackTable, occFilter)
+			newStream, n, usesFallback := replaceInDecodedStream(objects[u.streamIdx].stream, dr, matcher, simpleTable, fallbackTable, occFilter)
 			if n == 0 {
 				continue
 			}
@@ -431,6 +438,7 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 			occurrence = n
 		}
 	}
+	useRegex := r.FormValue("regex") == "true"
 	if len(find) > maxFieldLen || len(repl) > maxFieldLen {
 		http.Error(w, "find/replace text too long", http.StatusBadRequest)
 		return
@@ -449,7 +457,7 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
 	defer cancel()
-	edited, count, err := EditPDF(ctx, pdf, find, repl, lang, page, occurrence)
+	edited, count, err := EditPDF(ctx, pdf, find, repl, lang, page, occurrence, useRegex)
 	if err != nil {
 		var bad *badInputError
 		if errors.As(err, &bad) {

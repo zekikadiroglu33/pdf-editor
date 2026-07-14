@@ -10,6 +10,9 @@ Backend is Go (stdlib only, zero dependencies); the only external tool required 
 - Browser UI renders the uploaded PDF (via PDF.js) with a selectable text layer — drag to select text on the page and it fills the "Find text" box automatically, similar to Adobe's editor.
 - Zoom controls (50%–500%) for precisely selecting small text.
 - Language-aware character encoding: PDF content streams store text as raw bytes in a single-byte code page (usually WinAnsiEncoding/Windows-1252), not UTF-8. Pick "Turkish" from the language dropdown to correctly match/replace Turkish-specific letters (ş, Ş, ğ, Ğ, ı, İ) that don't exist in the default Latin table.
+- Optional regex find/replace: check "Use regex" to treat "Find text" as a Go regexp (RE2 — immune to catastrophic backtracking regardless of the pattern) matched against the document's actual text, with capture-group expansion in the replacement (`$1`, `${name}`, ...). Drag-to-select is literal-only and is disabled while regex mode is on, since occurrence targeting doesn't carry over to arbitrary patterns.
+- Undo: each successful edit is chainable (see below) and reversible — the "Undo" button in the toolbar reverts to the pre-edit version, up to 5 steps back in the current session.
+- Make as many edits as you want in one session without the page (or the download) refreshing on every single change: every completed edit's replacement text is highlighted in yellow directly on the rendered preview so you can review everything you've changed so far, and the Download link only appears once you click "Confirm changes" — so you always review before a file is handed to you, and any further edit or undo after confirming hides the stale download again until you re-confirm.
 
 ## Prerequisites
 
@@ -46,9 +49,9 @@ go build -o pdfer .
 go test ./...
 ```
 
-Fixture PDFs are built programmatically in `pdfer_test.go` (no binary `.pdf` files checked into the repo), covering the sharper edges of the format: kerning/structure preservation on a same-font replacement, `q`/`Q` graphics-state font restoration, zero-width subset-font fallback routing, and Form XObject content resolution.
+Fixture PDFs are built programmatically in `pdfer_test.go` (no binary `.pdf` files checked into the repo), covering the sharper edges of the format: kerning/structure preservation on a same-font replacement, `q`/`Q` graphics-state font restoration, zero-width subset-font fallback routing, Form XObject content resolution, and regex find/replace (capture-group expansion, invalid-pattern rejection).
 
-Open the URL in a browser: drop in a PDF, drag-select the text you want to change directly on the rendered page (or type it manually), choose the replacement text and language, then click **Edit PDF**. The edited file previews inline and is downloadable — no page reload needed. Selecting a specific occurrence only edits that one instance; each edit builds on the last, so you can make as many changes as you want in one session.
+Open the URL in a browser: drop in a PDF, drag-select the text you want to change directly on the rendered page (or type it manually, optionally as a regex), choose the replacement text and language, then click **Edit PDF**. Selecting a specific occurrence only edits that one instance; each edit builds on the last, so you can make as many changes as you want in one session — each one is highlighted in yellow on the preview as you go, and **Undo** in the toolbar steps back through up to 5 prior versions (highlights included) if an edit didn't go as planned. Nothing is downloadable yet at this point: once you're happy with the highlighted changes, click **Confirm changes & prepare download** to reveal the inline preview and Download link for that exact state — make another edit afterward and it hides again until you re-confirm.
 
 ### Docker
 
@@ -93,7 +96,7 @@ Measured with a synthetic ~46 MB PDF (near the 50 MB upload cap): a single edit 
 |---|---|---|---|
 | `/` | GET | — | Web UI |
 | `/api/health` | GET | — | `ok` |
-| `/api/edit` | POST | multipart form: `file` (PDF, max 50 MB), `find` (required), `replace`, `lang` (optional: `latin` default, or `turkish`) | Edited PDF bytes; header `X-Replacements: N` |
+| `/api/edit` | POST | multipart form: `file` (PDF, max 50 MB), `find` (required), `replace`, `lang` (optional: `latin` default, or `turkish`), `regex` (optional: `true` to treat `find` as a regexp), `page`/`occurrence` (optional: target a single match) | Edited PDF bytes; header `X-Replacements: N` |
 
 Example with curl:
 
@@ -116,7 +119,20 @@ curl -o edited.pdf \
   http://localhost:8080/api/edit
 ```
 
-Errors return plain text with status 400 (bad input — including an unknown `lang` or a character unsupported by the selected language) or 422 (PDF could not be processed).
+Regex mode uses Go's `regexp` syntax (RE2) for `find`, and `regexp.Expand` syntax for `replace` (`$1`, `${name}`, ...):
+
+```bash
+curl -o edited.pdf \
+  -F file=@report.pdf \
+  -F 'find=Invoice (\d+)-(\d+)' \
+  -F 'replace=INV-$2/$1' \
+  -F 'regex=true' \
+  http://localhost:8080/api/edit
+```
+
+Note: with `curl -F`, escape/avoid literal parentheses in the field value or use `--form-string` instead of `-F` — curl's own multipart syntax treats unescaped `(`/`,` specially in `-F` values. This only affects the `curl` CLI, not the browser UI (which uses `FormData` and sends field values literally).
+
+Errors return plain text with status 400 (bad input — including an unknown `lang`, an invalid regex, or a character unsupported by the selected language) or 422 (PDF could not be processed).
 
 ## How it works
 
@@ -131,6 +147,9 @@ Errors return plain text with status 400 (bad input — including an unknown `la
 - **Layout is not reflowed**: replacing "Hello" with a much longer string keeps the original glyph positions, so long replacements can overlap neighboring text.
 - **Text split across operators**: a phrase kerned into pieces like `(AC) -12 (ME)` won't match a search for `ACME`.
 - Scanned/image-only PDFs contain no text at all — you'd need OCR first.
+- **Regex mode and mouse-selection targeting don't combine**: drag-to-select occurrence targeting counts matches by plain substring search, which doesn't correspond to how a regex pattern matches, so the UI disables drag-to-select while "Use regex" is checked (regex mode always replaces every match in the document).
+- **Undo is in-memory and per-tab**: it steps back through the last 5 versions held in the browser tab's memory, not a server-side history — closing/reloading the tab loses it, same as the original upload if not downloaded.
+- **Change highlighting is a review aid, not a ground truth**: it's a browser-side overlay (nothing is written into the PDF itself) that marks any rendered text span containing a session edit's replacement text. There's no per-edit position tracking, so it can occasionally highlight an unrelated pre-existing occurrence of the same text, and it's skipped entirely for regex-mode edits (the replacement text differs per match, so there's no single fixed string to look for).
 
 ## Project structure
 

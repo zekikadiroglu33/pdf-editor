@@ -60,6 +60,19 @@
     transform-origin: 0% 0%;
   }
   .textLayer ::selection { background: rgba(79,140,255,.4); }
+  .textLayer span.pdfer-highlight { background: rgba(255,196,0,.45); border-radius: 2px; }
+  .confirm-row {
+    display: none; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 18px; padding: 12px 14px; border: 1px solid var(--ok); border-radius: 8px;
+    background: rgba(62,207,142,.08);
+  }
+  .confirm-row.show { display: flex; }
+  .confirm-row span { font-size: 13px; color: var(--text); }
+  .confirm-row button {
+    margin: 0; width: auto; padding: 9px 16px; font-size: 14px; border-radius: 8px;
+    background: var(--ok); color: #06281a; font-weight: 700; border: none; cursor: pointer;
+  }
+  .confirm-row button:hover { filter: brightness(1.08); }
   label { display: block; font-size: 13px; color: var(--muted); margin: 18px 0 6px; }
   input[type=text] {
     width: 100%; padding: 11px 12px; border-radius: 8px;
@@ -71,6 +84,15 @@
     border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 15px;
   }
   select:focus { outline: none; border-color: var(--accent); }
+  .checkbox-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 16px;
+    font-size: 13px; color: var(--muted); cursor: pointer;
+  }
+  .checkbox-row input { margin: 0; cursor: pointer; }
+  .checkbox-row code {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; font-size: 12px; color: var(--text);
+  }
   button {
     margin-top: 22px; width: 100%; padding: 13px; border: none; border-radius: 8px;
     background: var(--accent); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
@@ -98,11 +120,12 @@
     <div class="drop" id="drop">Drop a PDF here or click to choose</div>
     <input type="file" id="file" accept="application/pdf" hidden>
 
-    <p class="hint" id="viewerHint" style="display:none">Drag to select the text you want to change, right in the page below — it fills "Find text" automatically and only that occurrence gets edited (editing "Find text" by hand switches to replacing every match instead). Zoom in for small text to select it precisely.</p>
+    <p class="hint" id="viewerHint" style="display:none">Drag to select the text you want to change, right in the page below — it fills "Find text" automatically and only that occurrence gets edited (editing "Find text" by hand switches to replacing every match instead). Zoom in for small text to select it precisely. Edited text is highlighted in yellow so you can review every change made this session before downloading.</p>
     <div class="toolbar" id="toolbar">
       <button type="button" id="zoomOut">− Zoom out</button>
       <span id="zoomLevel">150%</span>
       <button type="button" id="zoomIn">+ Zoom in</button>
+      <button type="button" id="undo" disabled>↶ Undo</button>
     </div>
     <div class="viewer" id="viewer"></div>
 
@@ -118,8 +141,15 @@
     <label for="replace">Replace with</label>
     <input type="text" id="replace" placeholder="e.g. Globex Inc">
 
+    <label class="checkbox-row"><input type="checkbox" id="regex"> Use regex (e.g. <code>Invoice (\d+)-(\d+)</code> → <code>INV-$2/$1</code>)</label>
+
     <button id="go" disabled>Edit PDF</button>
     <div id="status"></div>
+
+    <div class="confirm-row" id="confirmRow">
+      <span id="pendingCount"></span>
+      <button type="button" id="confirmBtn">✓ Confirm changes &amp; prepare download</button>
+    </div>
   </div>
 
   <div id="result">

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"unicode/utf8"
 )
 
 // ---------------------------------------------------------------------------
@@ -871,6 +872,73 @@ func runesEqual(a, b []rune) bool {
 	return true
 }
 
+// textMatcher finds occurrences of the user's "find" text in a stream's
+// decoded rune sequence and produces the replacement runes for each match.
+// In literal mode every match gets the same replRunes; in regex mode the
+// replacement is expanded per match so capture-group references
+// ($1, ${name}, ...) work the way Go's regexp.Expand documents.
+//
+// Go's regexp package compiles to RE2, which runs in time linear in the
+// input length by construction - there's no catastrophic-backtracking
+// pattern a caller could submit to hang a worker, unlike PCRE/Perl-style
+// engines.
+type textMatcher struct {
+	findRunes []rune // literal mode only
+	replRunes []rune // literal mode only
+	re        *regexp.Regexp
+	replTmpl  string // regex mode: Go regexp.Expand-style template
+}
+
+func newTextMatcher(find, repl string, useRegex bool) (*textMatcher, error) {
+	if !useRegex {
+		return &textMatcher{findRunes: []rune(find), replRunes: []rune(repl)}, nil
+	}
+	re, err := regexp.Compile(find)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex: %w", err)
+	}
+	return &textMatcher{re: re, replTmpl: repl}, nil
+}
+
+type textMatch struct {
+	i, j int // rune range [i, j) in the stream's decoded runes
+	repl []rune
+}
+
+// findMatches returns every non-overlapping match in runes, in order.
+func (m *textMatcher) findMatches(runes []rune) []textMatch {
+	if m.re == nil {
+		fl := len(m.findRunes)
+		if fl == 0 {
+			return nil
+		}
+		var out []textMatch
+		for i := 0; i+fl <= len(runes); {
+			if runesEqual(runes[i:i+fl], m.findRunes) {
+				out = append(out, textMatch{i, i + fl, m.replRunes})
+				i += fl
+			} else {
+				i++
+			}
+		}
+		return out
+	}
+
+	s := string(runes)
+	locs := m.re.FindAllStringSubmatchIndex(s, -1)
+	if locs == nil {
+		return nil
+	}
+	out := make([]textMatch, 0, len(locs))
+	for _, loc := range locs {
+		i := utf8.RuneCountInString(s[:loc[0]])
+		j := i + utf8.RuneCountInString(s[loc[0]:loc[1]])
+		expanded := m.re.ExpandString(nil, m.replTmpl, s, loc)
+		out = append(out, textMatch{i, j, []rune(string(expanded))})
+	}
+	return out
+}
+
 // spanFullEnd is the byte offset through which a span must be consumed to
 // remove it cleanly: through its own Tj/'/" operator if it has one (opEnd),
 // or just its string token's end for a TJ array element, which has no
@@ -904,26 +972,12 @@ func literalBytes(escaped []byte) []byte {
 // match is left untouched. This is what lets a user's mouse selection in
 // the UI target exactly the word they clicked instead of every occurrence
 // of that word in the document.
-func replaceInDecodedStream(streamBytes []byte, dr *decodedStream, findRunes, replRunes []rune, simpleTable, fallbackTable map[rune]byte, occFilter *occurrenceFilter) (newStream []byte, count int, usesFallback bool) {
-	fl := len(findRunes)
-	n := len(dr.runes)
-	if fl == 0 {
-		return streamBytes, 0, false
-	}
-
-	type match struct{ i, j int }
-	var matches []match
-	for i := 0; i+fl <= n; {
-		if runesEqual(dr.runes[i:i+fl], findRunes) {
-			matches = append(matches, match{i, i + fl})
-			i += fl
-		} else {
-			i++
-		}
-	}
+func replaceInDecodedStream(streamBytes []byte, dr *decodedStream, m *textMatcher, simpleTable, fallbackTable map[rune]byte, occFilter *occurrenceFilter) (newStream []byte, count int, usesFallback bool) {
+	matches := m.findMatches(dr.runes)
 	if len(matches) == 0 {
 		return streamBytes, 0, false
 	}
+	n := len(dr.runes)
 
 	type edit struct {
 		start, end int
@@ -951,7 +1005,7 @@ func replaceInDecodedStream(streamBytes []byte, dr *decodedStream, findRunes, re
 
 		var fullRunes []rune
 		fullRunes = append(fullRunes, dr.runes[prefixStart:mt.i]...)
-		fullRunes = append(fullRunes, replRunes...)
+		fullRunes = append(fullRunes, mt.repl...)
 		fullRunes = append(fullRunes, dr.runes[mt.j:suffixEnd]...)
 
 		// Reroute to the bundled fallback font whenever the matched span

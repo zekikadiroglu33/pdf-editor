@@ -11,14 +11,84 @@ const toolbar = document.getElementById('toolbar');
 const zoomIn = document.getElementById('zoomIn');
 const zoomOut = document.getElementById('zoomOut');
 const zoomLevel = document.getElementById('zoomLevel');
+const undoBtn = document.getElementById('undo');
 const findInput = document.getElementById('find');
+const regexCheckbox = document.getElementById('regex');
+const confirmRow = document.getElementById('confirmRow');
+const confirmBtn = document.getElementById('confirmBtn');
+const pendingCount = document.getElementById('pendingCount');
 const MIN_SCALE = 0.5, MAX_SCALE = 5, ZOOM_STEP = 0.25;
+const MAX_HISTORY = 5; // capped so undo can't grow unbounded memory on large PDFs
 let pdfFile = null;
 let pdfDoc = null;
 let scale = 1.5;
 let selectedTarget = null; // { page, occurrence } for the last mouse selection, or null
+// historyStack holds, for each edit applied this session, the state from
+// just *before* that edit: the File it started from and a copy of
+// sessionEdits as it stood at that point - so undo can restore both
+// together and highlighting stays consistent with what's on screen.
+let historyStack = [];
+// sessionEdits tracks every completed edit's replacement text (and which
+// page it landed on, or 0 for "anywhere") purely so the preview can
+// highlight it for review - it's never sent to the server.
+let sessionEdits = [];
+
+function updateUndoButton() {
+  undoBtn.disabled = historyStack.length === 0;
+}
+
+// The Download/preview panel (#result) always reflects a snapshot the user
+// explicitly confirmed - any edit or undo after that hides it again, so a
+// stale file can never be handed out silently instead of the current one.
+function updateConfirmUI() {
+  result.style.display = 'none';
+  if (sessionEdits.length > 0) {
+    confirmRow.classList.add('show');
+    pendingCount.textContent = `${sessionEdits.length} change(s) made this session — review the highlights above, then:`;
+  } else {
+    confirmRow.classList.remove('show');
+  }
+}
+
+confirmBtn.addEventListener('click', () => {
+  const url = URL.createObjectURL(pdfFile);
+  document.getElementById('preview').src = url;
+  document.getElementById('dl').href = url;
+  result.style.display = 'block';
+});
+
+undoBtn.addEventListener('click', () => {
+  if (!historyStack.length) return;
+  const prevEntry = historyStack.pop();
+  updateUndoButton();
+  sessionEdits = prevEntry.edits;
+  // setFile() itself clears #status/#result as part of loading the file, so
+  // the "Reverted" message must be set after it returns, not before.
+  setFile(prevEntry.file, true);
+  setStatus('Reverted to the previous version.', 'ok');
+});
 
 const setStatus = (msg, cls = '') => { status.textContent = msg; status.className = cls; };
+
+// Marks every rendered text-layer span on this page whose content contains
+// one of this session's tracked replacement texts, so all the edits made so
+// far - not just the last one - stay visible for review as the user keeps
+// editing, zooms, or undoes. This is a review aid layered on the PDF.js text
+// layer, not something written into the PDF itself: it can occasionally
+// highlight a pre-existing, unrelated occurrence of the same text (there's
+// no per-edit position tracking to disambiguate), but it's a good-enough
+// approximation for "did my edits land where I expected".
+function applyHighlights(pageNum, textLayerDiv) {
+  if (sessionEdits.length === 0) return;
+  const edits = sessionEdits.filter(e => e.page === 0 || e.page === pageNum);
+  if (edits.length === 0) return;
+  for (const span of textLayerDiv.querySelectorAll('span')) {
+    const text = span.textContent;
+    if (text && edits.some(e => text.includes(e.text))) {
+      span.classList.add('pdfer-highlight');
+    }
+  }
+}
 
 async function renderPages() {
   viewer.innerHTML = '';
@@ -50,6 +120,7 @@ async function renderPages() {
         viewport,
       }).promise;
 
+      applyHighlights(n, textLayerDiv);
       viewer.appendChild(wrap);
     }
 
@@ -141,6 +212,11 @@ function locateSelectionOccurrence(rawSel) {
 // than where the mouseup landed) makes this work regardless of exactly
 // where the button came up.
 document.addEventListener('mouseup', () => {
+  // Occurrence targeting counts matches by plain substring search (see
+  // locateSelectionOccurrence below), which doesn't correspond to how a
+  // regex pattern matches - so drag-to-select is a literal-find-only
+  // convenience and is skipped while regex mode is on.
+  if (regexCheckbox.checked) return;
   const winSel = window.getSelection();
   if (!winSel || winSel.rangeCount === 0) return;
   const anchorNode = winSel.anchorNode;
@@ -165,10 +241,24 @@ document.addEventListener('mouseup', () => {
 // back to the (still available) replace-everywhere behavior.
 findInput.addEventListener('input', () => { selectedTarget = null; });
 
+// Switching into regex mode invalidates any earlier mouse-selection target
+// for the same reason (see the mouseup listener above).
+regexCheckbox.addEventListener('change', () => { selectedTarget = null; });
+
 const setFile = (f, keepZoom = false) => {
   if (!f || f.type !== 'application/pdf') { setStatus('Please choose a PDF file.', 'err'); return; }
   pdfFile = f;
   selectedTarget = null;
+  // keepZoom is only ever true for a programmatic transition within the
+  // same editing session (a chained edit's result, or an undo) - a fresh
+  // upload (keepZoom=false) starts a new session, so past versions no
+  // longer apply.
+  if (!keepZoom) {
+    historyStack = [];
+    sessionEdits = [];
+    updateUndoButton();
+  }
+  updateConfirmUI(); // also hides the (now stale) #result panel
   drop.textContent = `📄 ${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
   drop.classList.add('hasfile');
   go.disabled = false;
@@ -189,11 +279,13 @@ go.addEventListener('click', async () => {
   const find = document.getElementById('find').value;
   if (!find) { setStatus('Enter the text to find.', 'err'); return; }
 
+  const replaceValue = document.getElementById('replace').value;
   const form = new FormData();
   form.append('file', pdfFile);
   form.append('find', find);
-  form.append('replace', document.getElementById('replace').value);
+  form.append('replace', replaceValue);
   form.append('lang', document.getElementById('lang').value);
+  if (regexCheckbox.checked) form.append('regex', 'true');
   const targeted = !!selectedTarget;
   if (selectedTarget) {
     form.append('page', String(selectedTarget.page));
@@ -202,7 +294,6 @@ go.addEventListener('click', async () => {
 
   go.disabled = true;
   setStatus('Editing…');
-  result.style.display = 'none';
 
   try {
     const res = await fetch('/api/edit', { method: 'POST', body: form });
@@ -210,15 +301,31 @@ go.addEventListener('click', async () => {
 
     const count = res.headers.get('X-Replacements') || '0';
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    document.getElementById('preview').src = url;
-    document.getElementById('dl').href = url;
-    result.style.display = 'block';
 
     if (count !== '0') {
       // Continue the same session: the next edit builds on this result
       // instead of re-editing the original upload from scratch, so the
-      // user can make as many edits as they want, one after another.
+      // user can make as many edits as they want, one after another,
+      // without the page or the download panel updating on every single
+      // edit - only the interactive preview above (with highlights) does,
+      // and #result/#dl only reflect a state the user explicitly confirmed
+      // via the "Confirm changes" button.
+      // Push the pre-edit state onto the undo history first, capped so a
+      // long chained-editing session can't grow this unbounded.
+      historyStack.push({ file: pdfFile, edits: sessionEdits });
+      if (historyStack.length > MAX_HISTORY) historyStack.shift();
+      updateUndoButton();
+
+      // Track this edit's replacement text for the review highlight, one
+      // entry per completed edit. Regex mode is skipped: the actual
+      // replacement text differs per match (capture groups), so there's no
+      // single fixed string to search the rendered preview for.
+      if (!regexCheckbox.checked && replaceValue) {
+        sessionEdits = [...sessionEdits, { page: targeted ? selectedTarget.page : 0, text: replaceValue }];
+      }
+      // setFile() below calls updateConfirmUI() itself, using the
+      // sessionEdits value just set above.
+
       const editedFile = new File([blob], 'edited.pdf', { type: 'application/pdf' });
       document.getElementById('find').value = '';
       document.getElementById('replace').value = '';
