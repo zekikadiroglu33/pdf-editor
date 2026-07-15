@@ -1,0 +1,221 @@
+/* Shared design system for both pdfer pages (index.html = editor,
+   convert.html = converter) - anything specific to only one of them
+   (the PDF.js viewer/textLayer, the confirm-row, the format-grid,
+   result-doc) lives in that page's own <style> block instead. */
+
+/* Light theme is the default; dark applies automatically via the OS
+   preference, and either can be pinned explicitly via data-theme (set by
+   the toggle button in theme.js) which always wins over the media query. */
+:root {
+  --bg: #f6f7fb; --panel: #ffffff; --panel-2: #f1f2f6; --border: #e2e5ec;
+  --text: #171a21; --muted: #676e7e; --accent: #3b6fe0; --accent-ink: #ffffff;
+  --ok: #12946b; --ok-bg: #e6f8f1; --err: #d64545; --err-bg: #fdeaea;
+  --shadow: 0 1px 2px rgba(20,24,38,.04), 0 8px 24px rgba(20,24,38,.06);
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 18px;
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0d13; --panel: #151822; --panel-2: #1b1f2b; --border: #272c39;
+    --text: #e9ebf3; --muted: #8b93a7; --accent: #6790ff; --accent-ink: #06101f;
+    --ok: #35d29b; --ok-bg: rgba(53,210,155,.12); --err: #ff7a7a; --err-bg: rgba(255,122,122,.12);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f6f7fb; --panel: #ffffff; --panel-2: #f1f2f6; --border: #e2e5ec;
+  --text: #171a21; --muted: #676e7e; --accent: #3b6fe0; --accent-ink: #ffffff;
+  --ok: #12946b; --ok-bg: #e6f8f1; --err: #d64545; --err-bg: #fdeaea;
+  --shadow: 0 1px 2px rgba(20,24,38,.04), 0 8px 24px rgba(20,24,38,.06);
+}
+:root[data-theme="dark"] {
+  --bg: #0b0d13; --panel: #151822; --panel-2: #1b1f2b; --border: #272c39;
+  --text: #e9ebf3; --muted: #8b93a7; --accent: #6790ff; --accent-ink: #06101f;
+  --ok: #35d29b; --ok-bg: rgba(53,210,155,.12); --err: #ff7a7a; --err-bg: rgba(255,122,122,.12);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+}
+
+/* Self-hosted (see vendor/fonts/OFL.txt for license) - a strict CSP with
+   no third-party CDNs means a webfont has to ship with the app like
+   PDF.js already does, not load from fonts.googleapis.com. This is
+   Google's variable-font file, and font-weight is declared as a range
+   (not a fixed value) so the browser renders the exact requested weight
+   from the file's own weight axis instead of snapping unweighted text to
+   whichever single static weight happened to be declared. */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('vendor/fonts/space-grotesk.woff2') format('woff2');
+}
+
+* { box-sizing: border-box; margin: 0; }
+html { color-scheme: light dark; }
+body {
+  font-family: var(--font-display);
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  padding: 28px 16px 60px;
+  transition: background-color .15s, color .15s;
+}
+.app { width: 100%; max-width: 1200px; }
+
+.topbar { position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+.brand { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 12px; font-size: 36px; font-weight: 700; letter-spacing: -.02em; }
+.brand-icon { width: 42px; height: 42px; border-radius: 11px; display: block; }
+.brand .pdf { color: var(--text); }
+.brand .er { color: var(--accent); }
+.icon-btn {
+  width: auto; margin: 0; padding: 8px 10px; font-size: 16px; line-height: 1;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text); cursor: pointer; box-shadow: var(--shadow);
+}
+.icon-btn:hover { border-color: var(--accent); }
+.theme-toggle { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+
+.badge {
+  display: inline-flex; align-items: center; padding: 7px 18px;
+  font-size: 18px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+  color: #fff7ed; background: linear-gradient(135deg, #ff6b4a, #ff9a3d);
+  border-radius: 999px; box-shadow: 0 6px 16px rgba(255, 107, 74, .45);
+  transform: rotate(-4deg);
+  animation: badge-pop 2.4s ease-in-out infinite;
+}
+@keyframes badge-pop {
+  0%, 100% { transform: rotate(-4deg) scale(1); }
+  50% { transform: rotate(-4deg) scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge { animation: none; }
+}
+
+.sub { color: var(--muted); margin: 6px 0 24px; font-size: 14px; text-align: center; }
+
+.nav { display: flex; gap: 6px; justify-content: center; margin: 22px 0 24px; }
+.nav a {
+  padding: 9px 20px; font-size: 16px; font-weight: 700; letter-spacing: -.005em;
+  background: transparent; color: var(--muted); border: 1px solid transparent; border-radius: var(--radius-sm);
+  cursor: pointer; transition: .12s; display: inline-flex; align-items: center; gap: 7px;
+  text-decoration: none;
+}
+.nav a:hover:not(.active) { color: var(--text); }
+.nav a.active {
+  background: var(--panel); color: var(--text); border-color: var(--border); box-shadow: var(--shadow);
+}
+
+.layout { display: grid; grid-template-columns: minmax(320px, 400px) 1fr; gap: 20px; align-items: start; }
+@media (max-width: 880px) { .layout { grid-template-columns: 1fr; } }
+
+/* Icon-only glyphs (emoji) opt back out of Space Grotesk explicitly: it's
+   a Latin text/display face, and depending on the character some emoji
+   codepoints it doesn't actually cover still block the browser from
+   falling through to a real system emoji font (rather than the
+   platform's usual per-character fallback), rendering as a broken tofu
+   box instead of the intended icon. */
+.drop-icon, .empty-preview .icon, .result-doc-icon, .icon-btn {
+  font-family: system-ui, -apple-system, "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 22px; box-shadow: var(--shadow);
+  transition: background-color .15s, border-color .15s;
+  /* Grid items default to min-width:auto, which is their content's
+     intrinsic width - without this, a rendered PDF page wider than the
+     column would grow the whole grid track (and the page) instead of
+     being scrolled inside .viewer's own overflow:auto. */
+  min-width: 0;
+}
+
+h2.card-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 14px; }
+
+.drop {
+  border: 2px dashed var(--border); border-radius: var(--radius-md); padding: 26px 16px;
+  text-align: center; color: var(--muted); cursor: pointer; transition: .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+/* The PDF Tools section (tools.js) toggles the [hidden] attribute on
+   .drop elements (two drop zones share the class - the single-file one
+   and merge's multi-file one) - without this, [hidden] and .drop's own
+   display:flex tie in specificity and .drop wins, since author rules
+   beat the browser's built-in [hidden] rule regardless of specificity. */
+.drop[hidden] { display: none; }
+.drop .drop-icon { font-size: 26px; }
+.drop .drop-text { font-size: 15px; font-weight: 600; }
+.drop.over { border-color: var(--accent); background: var(--panel-2); color: var(--text); }
+.drop:hover { border-color: var(--accent); color: var(--text); }
+.drop.hasfile { border-style: solid; border-color: var(--ok); color: var(--text); background: var(--ok-bg); }
+
+label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 18px 0 6px; }
+label:first-of-type { margin-top: 20px; }
+input[type=text], select {
+  width: 100%; padding: 11px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 14.5px;
+  font-family: var(--font-display);
+  transition: border-color .12s, box-shadow .12s;
+}
+input[type=text]:focus, select:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.checkbox-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 16px;
+  font-size: 13px; color: var(--muted); cursor: pointer;
+}
+.checkbox-row input { margin: 0; cursor: pointer; accent-color: var(--accent); }
+.regex-hint code {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px;
+  padding: 1px 5px; font-size: 12px; color: var(--text);
+}
+
+button {
+  margin-top: 22px; width: 100%; padding: 12px; border: none; border-radius: var(--radius-sm);
+  background: var(--accent); color: var(--accent-ink); font-size: 17px; font-weight: 700;
+  font-family: var(--font-display); letter-spacing: -.005em; cursor: pointer;
+  transition: filter .1s, transform .05s;
+}
+button:hover:not(:disabled) { filter: brightness(1.08); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+#status, #convStatus { margin-top: 12px; font-size: 13.5px; min-height: 20px; font-weight: 600; }
+#status.ok, #convStatus.ok { color: var(--ok); }
+#status.err, #convStatus.err { color: var(--err); }
+
+.hint { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; line-height: 1.5; }
+
+.empty-preview {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 260px; color: var(--muted); text-align: center; font-size: 14px;
+}
+.empty-preview .icon { font-size: 34px; opacity: .6; }
+
+.download-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;
+  color: var(--accent-ink); background: var(--accent); padding: 9px 16px;
+  border-radius: var(--radius-sm); font-weight: 700; font-size: 14.5px; text-decoration: none;
+}
+.download-link:hover { filter: brightness(1.08); }
+
+/* Shared by convert.html's format picker and index.html's PDF Tools
+   picker (same visual language: a grid of toggle buttons, one active). */
+.format-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.format-opt {
+  margin: 0; width: auto; padding: 10px 6px; font-size: 14px; font-weight: 700;
+  font-family: var(--font-display); letter-spacing: -.005em;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; transition: .12s;
+}
+.format-opt:hover:not(.active) { border-color: var(--accent); }
+.format-opt.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* Shared by convert.html's Output card and index.html's PDF Tools
+   Output card. */
+.result-doc {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+  padding: 14px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.result-doc-icon { font-size: 28px; }
+.result-doc-info { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; min-width: 0; }
+.result-doc-info span { color: var(--muted); font-size: 12.5px; }

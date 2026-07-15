@@ -16,7 +16,8 @@ Backend is Go (stdlib only, zero Go dependencies); it shells out to a small numb
 - Optional regex find/replace: check "Use regex" to treat "Find text" as a Go regexp (RE2 — immune to catastrophic backtracking regardless of the pattern) matched against the document's actual text, with capture-group expansion in the replacement (`$1`, `${name}`, ...). Drag-to-select is literal-only and is disabled while regex mode is on, since occurrence targeting doesn't carry over to arbitrary patterns.
 - Undo: each successful edit is chainable (see below) and reversible — the "Undo" button in the toolbar reverts to the pre-edit version, up to 5 steps back in the current session.
 - Make as many edits as you want in one session without the page (or the download) refreshing on every single change: every completed edit's replacement text is highlighted in yellow directly on the rendered preview so you can review everything you've changed so far, and the Download link only appears once you click "Confirm changes" — so you always review before a file is handed to you, and any further edit or undo after confirming hides the stale download again until you re-confirm.
-- **PDF converter** (`convert*.go`, a separate module from the editor above): a "Convert" tab with its own upload/download flow converts a PDF to **Word (.docx), PowerPoint (.pptx), Excel (.xlsx), HTML, plain text, SVG, PNG, JPEG, TIFF, or WEBP**. The document formats are best-effort text extraction, not a layout-faithful conversion; the image formats are actual rendered pages. See [Converting to other formats](#converting-to-other-formats) and [Limitations](#limitations-honest-ones) below.
+- **PDF converter** (`convert*.go`, a separate module from the editor above), on its own page (`convert.html`, linked from the nav bar) with its own upload/download flow: converts a PDF to **Word (.docx), PowerPoint (.pptx), Excel (.xlsx), HTML, plain text, SVG, PNG, JPEG, TIFF, or WEBP**. The document formats are best-effort text extraction, not a layout-faithful conversion; the image formats are actual rendered pages. Being a separate page (not a tab sharing the editor's page) means it never loads PDF.js at all, since it has no interactive preview to render. See [Converting to other formats](#converting-to-other-formats) and [Limitations](#limitations-honest-ones) below.
+- **PDF Tools** (`pdftools.go`), a "PDF Tools" section on the Edit page: **rotate**, **merge**, **split**, **delete pages**, and **compress**. Unlike the find/replace engine and the converter, none of these touch this project's own PDF parser at all - each is a single `qpdf` invocation with the right flags/page-range syntax, since qpdf already does page selection, concatenation, and stream/image recompression better than reimplementing it here would. See [PDF Tools](#pdf-tools) below.
 
 ## Prerequisites
 
@@ -89,7 +90,7 @@ The server is meant to be safe to expose directly to the public internet with no
 - Per-IP rate limiting and a process-wide concurrency cap on `/api/edit` (each request spawns two `qpdf` subprocesses).
 - Request timeouts throughout: HTTP server read/write/idle timeouts, and a bounded context on every `qpdf` call and the overall edit pipeline, so a hung or adversarial upload can't tie up a worker indefinitely.
 - Panic recovery, structured request logging, and graceful shutdown on `SIGTERM`.
-- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js is self-hosted under `static/vendor/`) plus standard security headers.
+- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js and the UI's Space Grotesk webfont are both self-hosted under `static/vendor/`) plus standard security headers.
 - TLS is expected to be terminated in front of the app (reverse proxy / platform load balancer) — the binary itself serves plain HTTP.
 
 ### Sizing
@@ -108,6 +109,11 @@ Measured with a synthetic ~46 MB PDF (near the 50 MB upload cap): a single edit 
 | `/api/health` | GET | — | `ok` |
 | `/api/edit` | POST | multipart form: `file` (PDF, max 50 MB), `find` (required), `replace`, `lang` (optional: `latin` default, or `turkish`), `regex` (optional: `true` to treat `find` as a regexp), `page`/`occurrence` (optional: target a single match) | Edited PDF bytes; header `X-Replacements: N` |
 | `/api/convert` | POST | multipart form: `file` (PDF, max 50 MB), `format` (optional: `docx` default, or `pptx`/`xlsx`/`html`/`txt`/`svg`/`png`/`jpeg`/`tiff`/`webp`), `lang` (optional: `latin` default, or `turkish` — only affects decoding simple-font bytes, see `encoding.go`; ignored for the image formats, which don't decode text at all) | Converted file bytes (content type/filename match `format`; a multi-page image conversion instead returns a `.zip` of one image per page — see below); header `X-Pages: N` |
+| `/api/rotate` | POST | multipart form: `file` (PDF, max 50 MB), `angle` (required: a non-zero multiple of 90, e.g. `90`, `-90`, `180`), `pages` (optional qpdf page-range string, e.g. `1,3,5-7`; blank = every page) | Rotated PDF bytes |
+| `/api/merge` | POST | multipart form: `files` (2+ PDFs, same field name repeated) | Merged PDF bytes, pages concatenated in upload order |
+| `/api/split` | POST | multipart form: `file` (PDF, max 50 MB), `ranges` (optional, `;`-separated qpdf page-range strings, e.g. `1-3;4-6`; blank = split into one file per page) | A single PDF if `ranges` produced exactly one file, otherwise a `.zip` of `part-1.pdf`, `part-2.pdf`, ...; header `X-Parts: N` (zip responses only) |
+| `/api/delete-pages` | POST | multipart form: `file` (PDF, max 50 MB), `pages` (required qpdf page-range string of pages to remove, e.g. `2,4-5`) | PDF bytes with those pages removed |
+| `/api/compress` | POST | multipart form: `file` (PDF, max 50 MB), `quality` (optional, 1-100 JPEG quality for re-encoded images; blank = qpdf's own default) | Recompressed PDF bytes; headers `X-Original-Size`/`X-Compressed-Size` (bytes) |
 
 Example with curl:
 
@@ -172,6 +178,31 @@ curl -o converted.webp -F file=@report.pdf -F 'format=webp' http://localhost:808
 
 Errors return plain text with status 400 (bad input — including an unknown `lang`, an unknown `format`, an invalid regex, or a character unsupported by the selected language), 422 (PDF could not be processed), or 503 (an image format was requested but `pdftoppm`/`cwebp` isn't installed on this server — see Prerequisites).
 
+PDF Tools:
+
+```bash
+# Rotate all pages 90° clockwise
+curl -o rotated.pdf -F file=@report.pdf -F 'angle=90' http://localhost:8080/api/rotate
+
+# Rotate just pages 1 and 3, 90° counterclockwise
+curl -o rotated.pdf -F file=@report.pdf -F 'angle=-90' -F 'pages=1,3' http://localhost:8080/api/rotate
+
+# Merge 2+ PDFs, in order
+curl -o merged.pdf -F files=@a.pdf -F files=@b.pdf -F files=@c.pdf http://localhost:8080/api/merge
+
+# Split into one file per page (a .zip, since report.pdf has more than one page)
+curl -o split.zip -F file=@report.pdf http://localhost:8080/api/split
+
+# Split into two specific ranges instead
+curl -o split.zip -F file=@report.pdf -F 'ranges=1-3;4-6' http://localhost:8080/api/split
+
+# Delete pages 2 and 4-5
+curl -o deleted.pdf -F file=@report.pdf -F 'pages=2,4-5' http://localhost:8080/api/delete-pages
+
+# Compress, re-encoding images at JPEG quality 60
+curl -o compressed.pdf -F file=@report.pdf -F 'quality=60' http://localhost:8080/api/compress
+```
+
 ## How it works
 
 1. **Normalize** — `qpdf` rewrites the upload as a classic PDF: object streams disabled, content streams uncompressed, so text operators (`(Hello) Tj`) become plain bytes.
@@ -203,6 +234,16 @@ Errors return plain text with status 400 (bad input — including an unknown `la
 
 If `pdftoppm` (or, for `webp`, `cwebp`) isn't installed, requesting one of these four formats fails with a clear `503` error rather than crashing the server — every other feature keeps working normally.
 
+### PDF Tools
+
+`pdftools.go` backs the "PDF Tools" section on the Edit page: rotate, merge, split, delete pages, compress. Unlike everything else in this app, none of these touch this project's own hand-rolled PDF object parser at all - each is just one `qpdf` invocation with the right flags or page-range syntax, since qpdf already handles page selection/concatenation/recompression more robustly than reimplementing it here would:
+
+- **Rotate** — `qpdf --rotate=[+|-]angle:page-range in.pdf out.pdf`. The angle is always passed with an explicit sign (relative rotation, e.g. `+90`/`-90`), matching qpdf's own recommended usage.
+- **Merge** — `qpdf --empty --pages file1.pdf file2.pdf ... -- out.pdf`, concatenating every input's pages in upload order.
+- **Split** — `qpdf in.pdf --pages . <range> -- out.pdf`, once per requested range (or once per page, if no ranges were given). More than one output file is zipped together (`part-1.pdf`, `part-2.pdf`, ...) — the same "zip if multi, direct file if single" pattern the PNG/JPEG/TIFF/WEBP converter above already uses.
+- **Delete pages** — built as "keep everything except the given pages" via qpdf's own range-exclusion syntax (`1-z,x<pages-to-delete>`, see `qpdf --help=page-ranges`), rather than this app computing the complement itself.
+- **Compress** — `qpdf --compress-streams=y --recompress-flate --compression-level=9 --object-streams=generate --optimize-images [--jpeg-quality=N] in.pdf out.pdf`. Because this only re-encodes streams/images qpdf already finds, results vary a lot by input: a PDF with large uncompressed images can shrink dramatically, while a text-only or already-optimized PDF (or a tiny test file) may not shrink at all, or can even grow slightly from added object-stream overhead.
+
 ## Limitations (honest ones)
 
 - **CID/subset fonts are matched via `/ToUnicode`, not their embedded CMap**: text rendered through a CID/Type0 font is decoded using that font's `/ToUnicode` map, which is present in the vast majority of real-world PDFs (Word, Google Docs, LibreOffice, browser print-to-PDF) - but if a document omits it, that text won't match.
@@ -216,6 +257,8 @@ If `pdftoppm` (or, for `webp`, `cwebp`) isn't installed, requesting one of these
 - **Change highlighting is a review aid, not a ground truth**: it's a browser-side overlay (nothing is written into the PDF itself) that marks any rendered text span containing a session edit's replacement text. There's no per-edit position tracking, so it can occasionally highlight an unrelated pre-existing occurrence of the same text, and it's skipped entirely for regex-mode edits (the replacement text differs per match, so there's no single fixed string to look for).
 - **PDF conversion to a document format (docx/pptx/xlsx/html/txt/svg) is best-effort text extraction, not layout reconstruction**: paragraphs are inferred from vertical line spacing (see "Converting to other formats" above), so multi-column layouts, tables, and precise indentation are not reproduced — everything comes out as a linear sequence of paragraphs (or, for xlsx, rows), per page. Embedded images aren't carried over at all in these formats. It shares the same CID/`/ToUnicode` and font-encoding limitations as find/replace, described above.
 - **Raster image export (PNG/JPEG/TIFF/WEBP) requires `pdftoppm`/`cwebp` to be installed** (see Prerequisites) — unlike every other feature in this app, it isn't optional-dependency-free, since actually rendering a page's pixels needs a real PDF renderer, not text extraction. It also doesn't apply the `lang` setting at all (there's no text decoding involved), and a multi-page PDF comes back as a `.zip` of one image per page rather than a single file (see "Converting to other formats" above).
+- **Compress is only as good as what qpdf can already recompress**: it re-encodes streams and images qpdf recognizes, it doesn't downsample image resolution or rewrite fonts - a scanned PDF full of large uncompressed images shrinks a lot, a mostly-text PDF may barely shrink (or, for a tiny file, grow slightly from object-stream overhead).
+- **No visual crop, watermark, or image-insertion tools yet**: rotate/merge/split/delete-pages/compress are the qpdf-native tier of a larger PDF Tools set; crop and watermark (content-stream editing) and adding/compressing embedded images (image codec work) are still on the roadmap - see the project's own notes on scoping this in stages.
 
 ## Project structure
 
@@ -233,11 +276,14 @@ pdf-editor/
 ├── convert_txt.go            # .txt writer
 ├── convert_svg.go            # .svg writer
 ├── convert_raster.go         # .png/.jpeg/.tiff/.webp writer (shells out to pdftoppm/cwebp - see Prerequisites)
+├── pdftools.go              # rotate/merge/split/delete-pages/compress - all thin wrappers around qpdf's own CLI
+├── handlers_pdftools.go      # HTTP handlers for the pdftools.go operations
 ├── encoding.go              # rune <-> byte tables per language (latin, turkish, ...)
 ├── fallbackfont.go           # bundled fallback-font PDF object builder
 ├── fallbackfont_data.go      # generated widths/metrics for the fallback font
 ├── pdfer_test.go             # regression tests (programmatically-built fixture PDFs)
 ├── convert_test.go           # regression tests for the PDF converter (all output formats)
+├── pdftools_test.go          # regression tests for rotate/merge/split/delete-pages/compress
 ├── Dockerfile
 ├── docker-compose.yml         # pdfer + Caddy (reverse proxy, automatic HTTPS) for VPS deploys
 ├── Caddyfile
@@ -245,7 +291,14 @@ pdf-editor/
 ├── assets/
 │   └── pdfer-fallback.ttf   # subsetted DejaVu Sans, embedded for fallback rendering
 └── static/
-    ├── index.html           # browser UI markup/styles
-    ├── app.js                # browser UI logic: PDF.js preview, drag-to-select, zoom, language picker
-    └── vendor/                # self-hosted PDF.js (required for a strict CSP - no third-party CDN)
+    ├── index.html           # Editor page markup (Edit + PDF Tools) - links style.css, loads pdf.js + theme.js + app.js + tools.js
+    ├── convert.html          # Converter page markup - links style.css, loads only theme.js + convert.js (no pdf.js)
+    ├── style.css             # shared design system (theme vars, layout, cards, buttons, form controls) for both pages
+    ├── theme.js              # shared light/dark toggle logic for both pages
+    ├── app.js                # Editor page logic: PDF.js preview, drag-to-select, click-to-edit, zoom, undo
+    ├── tools.js              # PDF Tools logic: rotate/merge/split/delete-pages/compress, upload/process/download
+    ├── convert.js            # Converter page logic: format picker, upload/convert/download
+    └── vendor/
+        ├── fonts/            # self-hosted Space Grotesk (OFL.txt included) - same strict-CSP reasoning as pdf.js below
+        └── ...                # self-hosted PDF.js (required for a strict CSP - no third-party CDN)
 ```

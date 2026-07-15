@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pdfer — Free PDF Converter</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="stylesheet" href="style.css">
+<!-- Converter-only markup below; shared chrome and the format-grid/
+     result-doc components (also used by index.html's PDF Tools section)
+     live in style.css. This page never loads PDF.js at all, since it
+     doesn't render an interactive preview of the upload. -->
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><span><span class="pdf">pdf</span><span class="er">er</span></span><span class="badge">Free</span></div>
+    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
+  </div>
+  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
+
+  <nav class="nav">
+    <a href="/">✎ Edit</a>
+    <a href="/convert.html" class="active">⇄ Convert</a>
+  </nav>
+
+  <div class="layout">
+    <section class="card">
+      <h2 class="card-title">Convert</h2>
+      <p class="hint">Best-effort text extraction: wrapped lines are stitched back into paragraphs, but columns, tables and images are not reconstructed. Scanned/image-only PDFs have no text to convert.</p>
+
+      <div class="drop" id="convDrop">
+        <span class="drop-icon">📄</span>
+        <span class="drop-text">Drop a PDF here or click to choose</span>
+      </div>
+      <input type="file" id="convFile" accept="application/pdf" hidden>
+
+      <label for="convFormat">Convert to</label>
+      <div class="format-grid" id="convFormat">
+        <button type="button" class="format-opt active" data-format="docx" data-ext=".docx" data-icon="📝">Word</button>
+        <button type="button" class="format-opt" data-format="pptx" data-ext=".pptx" data-icon="📽">PowerPoint</button>
+        <button type="button" class="format-opt" data-format="xlsx" data-ext=".xlsx" data-icon="📊">Excel</button>
+        <button type="button" class="format-opt" data-format="html" data-ext=".html" data-icon="🌐">HTML</button>
+        <button type="button" class="format-opt" data-format="txt" data-ext=".txt" data-icon="📄">Plain text</button>
+        <button type="button" class="format-opt" data-format="svg" data-ext=".svg" data-icon="🖼">SVG</button>
+        <button type="button" class="format-opt" data-format="png" data-ext=".png" data-icon="🖼">PNG</button>
+        <button type="button" class="format-opt" data-format="jpeg" data-ext=".jpg" data-icon="🖼">JPEG</button>
+        <button type="button" class="format-opt" data-format="tiff" data-ext=".tif" data-icon="🖼">TIFF</button>
+        <button type="button" class="format-opt" data-format="webp" data-ext=".webp" data-icon="🖼">WEBP</button>
+      </div>
+      <p class="hint" id="rasterHint" style="display:none">Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
+
+      <label for="convLang">Language</label>
+      <select id="convLang">
+        <option value="latin">Latin / English (default)</option>
+        <option value="turkish">Turkish</option>
+      </select>
+
+      <button id="convGo" disabled>Convert to .docx</button>
+      <div id="convStatus"></div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">Output</h2>
+      <div class="empty-preview" id="convEmptyPreview">
+        <span class="icon">🗎</span>
+        <span>Your converted file will appear here.</span>
+      </div>
+      <div id="convResult" style="display:none">
+        <div class="result-doc">
+          <span class="result-doc-icon" id="convResultIcon">📝</span>
+          <div class="result-doc-info">
+            <strong id="convResultName">converted.docx</strong>
+            <span id="convMeta"></span>
+          </div>
+        </div>
+        <a id="convDl" class="download-link" download="converted.docx">⬇ Download</a>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="theme.js"></script>
+<script src="convert.js"></script>
+</body>
+</html>

@@ -572,10 +572,27 @@ func main() {
 	convertRateLimiter := newRateLimiter(0.5, 15)
 	convertHandler := convertLimiter.middleware(rateLimitMiddleware(convertRateLimiter, http.HandlerFunc(handleConvert)))
 
+	// The five qpdf-backed page/document tools (rotate, merge, split,
+	// delete-pages, compress - see pdftools.go) share one limiter pair:
+	// each is a single qpdf subprocess call, a similar cost profile to
+	// each other and lighter than /api/edit's two-pass pipeline, so they
+	// don't need a limiter per route the way edit/convert do - just their
+	// own budget, isolated from those two busier routes.
+	toolsLimiter := newConcurrencyLimiter(8)
+	toolsRateLimiter := newRateLimiter(0.5, 15)
+	toolsMiddleware := func(h http.HandlerFunc) http.Handler {
+		return toolsLimiter.middleware(rateLimitMiddleware(toolsRateLimiter, h))
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(static)))
 	mux.Handle("/api/edit", editHandler)
 	mux.Handle("/api/convert", convertHandler)
+	mux.Handle("/api/rotate", toolsMiddleware(handleRotate))
+	mux.Handle("/api/merge", toolsMiddleware(handleMerge))
+	mux.Handle("/api/split", toolsMiddleware(handleSplit))
+	mux.Handle("/api/delete-pages", toolsMiddleware(handleDeletePages))
+	mux.Handle("/api/compress", toolsMiddleware(handleCompress))
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte("ok"))
 	})
