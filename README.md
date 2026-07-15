@@ -2,7 +2,7 @@
 
 # pdfer — PDF Text Editor
 
-A small, self-contained web service that edits text inside PDF files: upload a PDF, select or type the text to find, type its replacement, and download the edited PDF. Includes a browser UI with a PDF.js-powered preview — drag-select text directly on the rendered page instead of retyping it.
+A small, self-contained web service that edits text inside PDF files: upload a PDF, select or type the text to find, type its replacement, and download the edited PDF. Includes a browser UI with a PDF.js-powered preview — click text directly on the rendered page to edit it in place, Acrobat-style, or drag-select it into the sidebar instead.
 
 Backend is Go (stdlib only, zero Go dependencies); it shells out to a small number of external CLI tools, the same way it always has for `qpdf` (see Prerequisites).
 
@@ -10,6 +10,7 @@ Backend is Go (stdlib only, zero Go dependencies); it shells out to a small numb
 
 - Find/replace text inside PDF content streams, with correct `/Length` and xref rebuilding.
 - Browser UI renders the uploaded PDF (via PDF.js) with a selectable text layer — drag to select text on the page and it fills the "Find text" box automatically, similar to Adobe's editor.
+- **Click-to-edit**: click any text run directly on the rendered page and it becomes editable right there — type the replacement and press Enter (Esc cancels). This is a workflow shortcut over the same single-occurrence `/api/edit` call the drag-to-select flow already makes, not a layout engine: there's no live reflow, so a much longer replacement can still overlap neighboring text, same as every other edit path in this app (see Limitations).
 - Zoom controls (50%–500%) for precisely selecting small text.
 - Language-aware character encoding: PDF content streams store text as raw bytes in a single-byte code page (usually WinAnsiEncoding/Windows-1252), not UTF-8. Pick "Turkish" from the language dropdown to correctly match/replace Turkish-specific letters (ş, Ş, ğ, Ğ, ı, İ) that don't exist in the default Latin table.
 - Optional regex find/replace: check "Use regex" to treat "Find text" as a Go regexp (RE2 — immune to catastrophic backtracking regardless of the pattern) matched against the document's actual text, with capture-group expansion in the replacement (`$1`, `${name}`, ...). Drag-to-select is literal-only and is disabled while regex mode is on, since occurrence targeting doesn't carry over to arbitrary patterns.
@@ -60,7 +61,7 @@ go test ./...
 
 Fixture PDFs are built programmatically in `pdfer_test.go` (no binary `.pdf` files checked into the repo), covering the sharper edges of the format: kerning/structure preservation on a same-font replacement, `q`/`Q` graphics-state font restoration, zero-width subset-font fallback routing, Form XObject content resolution, and regex find/replace (capture-group expansion, invalid-pattern rejection).
 
-Open the URL in a browser: drop in a PDF, drag-select the text you want to change directly on the rendered page (or type it manually, optionally as a regex), choose the replacement text and language, then click **Edit PDF**. Selecting a specific occurrence only edits that one instance; each edit builds on the last, so you can make as many changes as you want in one session — each one is highlighted in yellow on the preview as you go, and **Undo** in the toolbar steps back through up to 5 prior versions (highlights included) if an edit didn't go as planned. Nothing is downloadable yet at this point: once you're happy with the highlighted changes, click **Confirm changes & prepare download** to reveal the inline preview and Download link for that exact state — make another edit afterward and it hides again until you re-confirm.
+Open the URL in a browser: drop in a PDF, then either click text directly on the rendered page to edit it right there (type the replacement, press Enter to apply, Esc to cancel), or drag-select the text you want to change (or type it manually, optionally as a regex), choose the replacement text and language, then click **Edit PDF**. Selecting a specific occurrence only edits that one instance; each edit builds on the last, so you can make as many changes as you want in one session — each one is highlighted in yellow on the preview as you go, and **Undo** in the toolbar steps back through up to 5 prior versions (highlights included) if an edit didn't go as planned. Nothing is downloadable yet at this point: once you're happy with the highlighted changes, click **Confirm changes & prepare download** to reveal the inline preview and Download link for that exact state — make another edit afterward and it hides again until you re-confirm.
 
 ### Docker
 
@@ -206,7 +207,8 @@ If `pdftoppm` (or, for `webp`, `cwebp`) isn't installed, requesting one of these
 
 - **CID/subset fonts are matched via `/ToUnicode`, not their embedded CMap**: text rendered through a CID/Type0 font is decoded using that font's `/ToUnicode` map, which is present in the vast majority of real-world PDFs (Word, Google Docs, LibreOffice, browser print-to-PDF) - but if a document omits it, that text won't match.
 - **Font `/Differences` isn't parsed for matching**: the `lang` option assumes WinAnsiEncoding (`latin`) or Windows-1254 (`turkish`) for *decoding* a simple font's bytes. Replacement text that the matched font can't safely render (wrong glyph, or a byte with no `/Widths` entry in that specific subset font) is automatically routed through a bundled fallback font instead of guessing.
-- **Layout is not reflowed**: replacing "Hello" with a much longer string keeps the original glyph positions, so long replacements can overlap neighboring text.
+- **Layout is not reflowed**: replacing "Hello" with a much longer string keeps the original glyph positions, so long replacements can overlap neighboring text. This applies to click-to-edit too — it looks and feels like Acrobat's inline editing, but underneath it's the same fixed-position single-occurrence replace as drag-to-select, not a real layout engine with font-metric-aware reflow.
+- **Click-to-edit edits exactly one content-stream text run**: which run that is depends on how the PDF's own content stream chunked its text (one `Tj`/`TJ` call can be a whole line, a whole sentence, or just a few kerned characters) - it's not sentence- or paragraph-aware, so which exact span becomes editable on click is up to how the original PDF (or the app that produced it) split its text operators, not this app's page-layout analysis.
 - **Text split across operators**: a phrase kerned into pieces like `(AC) -12 (ME)` won't match a search for `ACME`.
 - Scanned/image-only PDFs contain no text at all — you'd need OCR first.
 - **Regex mode and mouse-selection targeting don't combine**: drag-to-select occurrence targeting counts matches by plain substring search, which doesn't correspond to how a regex pattern matches, so the UI disables drag-to-select while "Use regex" is checked (regex mode always replaces every match in the document).

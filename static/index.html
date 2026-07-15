@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pdfer — PDF Text Editor</title>
+<title>pdfer — Free PDF Editor &amp; Converter</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <style>
   /* Light theme is the default; dark applies automatically via the OS
@@ -49,7 +49,7 @@
   .app { width: 100%; max-width: 1200px; }
 
   .topbar { position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
-  .brand { display: flex; align-items: center; gap: 12px; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+  .brand { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 12px; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
   .brand-icon { width: 42px; height: 42px; border-radius: 11px; display: block; }
   .brand .pdf { color: var(--text); }
   .brand .er { color: var(--accent); }
@@ -60,6 +60,22 @@
   }
   .icon-btn:hover { border-color: var(--accent); }
   .theme-toggle { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+
+  .badge {
+    display: inline-flex; align-items: center; padding: 7px 18px;
+    font-size: 17px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase;
+    color: #fff7ed; background: linear-gradient(135deg, #ff6b4a, #ff9a3d);
+    border-radius: 999px; box-shadow: 0 6px 16px rgba(255, 107, 74, .45);
+    transform: rotate(-4deg);
+    animation: badge-pop 2.4s ease-in-out infinite;
+  }
+  @keyframes badge-pop {
+    0%, 100% { transform: rotate(-4deg) scale(1); }
+    50% { transform: rotate(-4deg) scale(1.1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .badge { animation: none; }
+  }
 
   .sub { color: var(--muted); margin: 6px 0 24px; font-size: 14px; text-align: center; }
 
@@ -172,6 +188,10 @@
   .textLayer span, .textLayer br { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
   .textLayer ::selection { background: rgba(59,111,224,.35); }
   .textLayer span.pdfer-highlight { background: rgba(255,196,0,.5); border-radius: 2px; }
+  .textLayer span.editing {
+    color: #111317; background: #fff; outline: 2px solid var(--accent); outline-offset: 1px;
+    border-radius: 2px; z-index: 5; cursor: text;
+  }
 
   #result { width: 100%; margin-top: 20px; display: none; }
   #result iframe {
@@ -218,10 +238,10 @@
 <body>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><span><span class="pdf">pdf</span><span class="er">er</span></span></div>
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><span><span class="pdf">pdf</span><span class="er">er</span></span><span class="badge">Free</span></div>
     <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
   </div>
-  <p class="sub">Upload a PDF, edit its text or convert it to another format — reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
+  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
 
   <div class="tabs" role="tablist">
     <button type="button" class="tab active" id="tabEdit" role="tab" aria-selected="true" data-panel="editPanel">✎ Find &amp; Replace</button>
@@ -264,7 +284,7 @@
 
       <section class="card">
         <h2 class="card-title">Preview</h2>
-        <p class="hint" id="viewerHint" style="display:none">Drag to select the text you want to change, right on the page below — it fills "Find text" automatically and only that occurrence gets edited (editing "Find text" by hand switches to replacing every match instead). Zoom in for small text to select it precisely. Edited text is highlighted in yellow so you can review every change made this session before downloading.</p>
+        <p class="hint" id="viewerHint" style="display:none">Click any text on the page below to edit it right there — type the new text and press Enter to apply it (Esc cancels). Or drag to select text instead to fill "Find text" — useful for replacing every occurrence, or with regex mode (editing "Find text" by hand switches to replacing every match instead). Zoom in for small text to select or click it precisely. Edited text is highlighted in yellow so you can review every change made this session before downloading.</p>
         <div class="toolbar" id="toolbar">
           <button type="button" id="zoomOut">− Zoom out</button>
           <span id="zoomLevel">150%</span>

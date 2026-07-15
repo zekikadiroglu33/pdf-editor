@@ -193,6 +193,23 @@ function setZoom(next) {
 zoomIn.addEventListener('click', () => setZoom(scale + ZOOM_STEP));
 zoomOut.addEventListener('click', () => setZoom(scale - ZOOM_STEP));
 
+// Counts how many times target already appears in pageText before offset,
+// giving the 0-indexed occurrence a match starting at (or after) offset
+// would be - shared by drag-to-select (locateSelectionOccurrence, from a
+// live browser Selection) and click-to-edit (startInlineEdit, from a
+// clicked span's position) since both need the same "which occurrence is
+// this" answer, just starting from a different kind of position.
+function occurrenceAtOffset(pageText, target, offset) {
+  let occurrence = 0, idx = 0;
+  for (;;) {
+    const m = pageText.indexOf(target, idx);
+    if (m === -1 || m >= offset) break;
+    occurrence++;
+    idx = m + target.length;
+  }
+  return occurrence;
+}
+
 // Figures out which page and which occurrence-within-that-page (0-indexed,
 // reading order) a mouse selection corresponds to, so the edit can target
 // exactly the word the user clicked instead of every occurrence of it in
@@ -229,14 +246,7 @@ function locateSelectionOccurrence(rawSel) {
     return null;
   }
 
-  let occurrence = 0, idx = 0;
-  for (;;) {
-    const m = pageText.indexOf(rawSel, idx);
-    if (m === -1 || m >= offset) break;
-    occurrence++;
-    idx = m + rawSel.length;
-  }
-  return { page: pageNum, occurrence };
+  return { page: pageNum, occurrence: occurrenceAtOffset(pageText, rawSel, offset) };
 }
 
 // Listen on the whole document, not just #viewer: a drag that starts
@@ -250,6 +260,13 @@ function locateSelectionOccurrence(rawSel) {
 // select a word". Checking where the resulting *selection* lives (rather
 // than where the mouseup landed) makes this work regardless of exactly
 // where the button came up.
+// Set whenever this mouseup handler acts on a real drag-selection, so the
+// click handler right after it (see below) can tell "the user dragged to
+// select text" apart from "the user just clicked once" - which it
+// otherwise couldn't, since focusing findInput below collapses the
+// browser's text selection before the click handler ever runs.
+let justDragSelected = false;
+
 document.addEventListener('mouseup', () => {
   // Occurrence targeting counts matches by plain substring search (see
   // locateSelectionOccurrence below), which doesn't correspond to how a
@@ -265,6 +282,7 @@ document.addEventListener('mouseup', () => {
   const rawSel = winSel.toString();
   const sel = rawSel.replace(/\s+/g, ' ').trim();
   if (sel) {
+    justDragSelected = true;
     // Compute the occurrence target *before* moving focus - focusing
     // findInput collapses the document's text selection in Chrome, which
     // would otherwise wipe out window.getSelection() right before we
@@ -273,6 +291,134 @@ document.addEventListener('mouseup', () => {
     findInput.value = sel;
     findInput.focus();
   }
+});
+
+// --- Click-to-edit: click text directly on the rendered page to retype it
+// in place, Acrobat-style. This is a workflow shortcut over the same
+// single-occurrence /api/edit call the drag-to-select flow above already
+// makes - there's no live reflow (see README limitations: replacement text
+// still sits at the original glyph position), just a nicer, more direct
+// way to trigger it than selecting text and retyping it in the sidebar.
+let activeInlineEdit = null; // { span, onKeydown, onBlur } for the span currently being edited, or null
+
+function endInlineEdit(span) {
+  if (!activeInlineEdit || activeInlineEdit.span !== span) return;
+  span.removeEventListener('keydown', activeInlineEdit.onKeydown);
+  span.removeEventListener('blur', activeInlineEdit.onBlur);
+  activeInlineEdit = null;
+  span.contentEditable = 'false';
+  span.classList.remove('editing');
+}
+
+async function commitInlineEdit(span, pageNum, originalText, occurrence, cancelled) {
+  endInlineEdit(span);
+  if (cancelled) {
+    span.textContent = originalText;
+    return;
+  }
+  const newText = span.textContent.replace(/\s+/g, ' ').trim();
+  if (!newText || newText === originalText) {
+    span.textContent = originalText; // no-op or whitespace-only edit
+    return;
+  }
+
+  setStatus('Editing…');
+  go.disabled = true;
+  try {
+    const form = new FormData();
+    form.append('file', pdfFile);
+    form.append('find', originalText);
+    form.append('replace', newText);
+    form.append('lang', document.getElementById('lang').value);
+    form.append('page', String(pageNum));
+    form.append('occurrence', String(occurrence));
+
+    const res = await fetch('/api/edit', { method: 'POST', body: form });
+    if (!res.ok) throw new Error(await res.text());
+
+    const count = res.headers.get('X-Replacements') || '0';
+    const blob = await res.blob();
+
+    if (count === '0') {
+      span.textContent = originalText;
+      setStatus('Done, but no matches were found. (Try clicking the text again.)', 'err');
+      return;
+    }
+
+    historyStack.push({ file: pdfFile, edits: sessionEdits });
+    if (historyStack.length > MAX_HISTORY) historyStack.shift();
+    updateUndoButton();
+    sessionEdits = [...sessionEdits, { page: pageNum, text: newText }];
+
+    const editedFile = new File([blob], 'edited.pdf', { type: 'application/pdf' });
+    setFile(editedFile, true);
+    setStatus('Done — inline edit applied. Click more text to keep editing.', 'ok');
+  } catch (err) {
+    span.textContent = originalText;
+    setStatus('Error: ' + err.message, 'err');
+  } finally {
+    go.disabled = false;
+  }
+}
+
+function startInlineEdit(span, pageNum, pageText) {
+  if (activeInlineEdit) {
+    // Switching targets mid-edit: commit/discard whatever was being typed
+    // into the previous span first, so at most one is ever editable.
+    const prev = activeInlineEdit;
+    commitInlineEdit(prev.span, prev.pageNum, prev.originalText, prev.occurrence, false);
+  }
+
+  const originalText = span.textContent;
+  if (!originalText || !originalText.trim()) return;
+
+  const textLayerDiv = span.closest('.textLayer');
+  const range = document.createRange();
+  range.setStart(textLayerDiv, 0);
+  range.setEndBefore(span);
+  const occurrence = occurrenceAtOffset(pageText, originalText, range.toString().length);
+
+  let cancelled = false;
+  const onKeydown = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      span.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelled = true;
+      span.blur();
+    }
+  };
+  const onBlur = () => commitInlineEdit(span, pageNum, originalText, occurrence, cancelled);
+
+  span.contentEditable = 'true';
+  span.classList.add('editing');
+  span.addEventListener('keydown', onKeydown);
+  span.addEventListener('blur', onBlur);
+  activeInlineEdit = { span, pageNum, originalText, occurrence, onKeydown, onBlur };
+
+  span.focus();
+  // Select the run's existing text so typing immediately replaces it,
+  // matching how a normal text input behaves when you click into it.
+  const selRange = document.createRange();
+  selRange.selectNodeContents(span);
+  const winSel = window.getSelection();
+  winSel.removeAllRanges();
+  winSel.addRange(selRange);
+}
+
+viewer.addEventListener('click', e => {
+  if (justDragSelected) { justDragSelected = false; return; }
+  if (regexCheckbox.checked || !pdfFile || go.disabled) return;
+
+  const span = e.target.closest('.textLayer span');
+  if (!span || span.isContentEditable) return;
+
+  const pageWrap = span.closest('.page-wrap');
+  const pageNum = Array.prototype.indexOf.call(viewer.children, pageWrap) + 1;
+  if (pageNum < 1) return;
+
+  startInlineEdit(span, pageNum, pageWrap.querySelector('.textLayer').textContent);
 });
 
 // Manually editing "Find text" invalidates the mouse-selection target,
