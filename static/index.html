@@ -9,7 +9,8 @@
 <style>
   /* Editor-only styling - shared chrome (topbar, cards, buttons, form
      controls, etc.) lives in style.css; the format-grid/result-doc
-     equivalents for the converter live in convert.html instead. */
+     components used by convert.html and tools.html aren't needed here,
+     since the editor has no format/tool picker of its own. */
   .confirm-row {
     display: none; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
     margin-top: 16px; padding: 14px; border: 1px solid var(--ok); border-radius: var(--radius-md);
@@ -61,13 +62,6 @@
     width: 100%; height: 640px; border: 1px solid var(--border);
     border-radius: var(--radius-md); background: #fff; box-shadow: var(--shadow);
   }
-
-  /* PDF Tools section divider - the format-grid/result-doc components it
-     uses are shared with convert.html and live in style.css. */
-  .section-title {
-    font-size: 15px; font-weight: 700; color: var(--text); margin: 40px 0 20px;
-    padding-top: 28px; border-top: 1px solid var(--border);
-  }
 </style>
 </head>
 <body>
@@ -81,6 +75,7 @@
   <nav class="nav">
     <a href="/" class="active">✎ Edit</a>
     <a href="/convert.html">⇄ Convert</a>
+    <a href="/tools.html">🛠 Tools</a>
   </nav>
 
   <div class="layout">
@@ -137,139 +132,10 @@
     <a id="dl" class="download-link" download="edited.pdf">⬇ Download edited.pdf</a>
     <iframe id="preview" title="Edited PDF preview"></iframe>
   </div>
-
-  <h2 class="section-title">PDF Tools</h2>
-  <div class="layout">
-    <section class="card">
-      <h2 class="card-title">Tools</h2>
-      <div class="format-grid" id="toolPicker">
-        <button type="button" class="format-opt active" data-tool="rotate">↻ Rotate</button>
-        <button type="button" class="format-opt" data-tool="merge">🔗 Merge</button>
-        <button type="button" class="format-opt" data-tool="split">✂ Split</button>
-        <button type="button" class="format-opt" data-tool="delete">🗑 Delete pages</button>
-        <button type="button" class="format-opt" data-tool="compress">📦 Compress</button>
-        <button type="button" class="format-opt" data-tool="watermark">💧 Watermark</button>
-        <button type="button" class="format-opt" data-tool="crop">⛶ Crop</button>
-        <button type="button" class="format-opt" data-tool="addimage">🖼 Add image</button>
-        <button type="button" class="format-opt" data-tool="compressimages">🗜 Compress images</button>
-      </div>
-
-      <div class="drop" id="toolDrop">
-        <span class="drop-icon">📄</span>
-        <span class="drop-text">Drop a PDF here or click to choose</span>
-      </div>
-      <input type="file" id="toolFile" accept="application/pdf" hidden>
-
-      <div class="drop" id="mergeDrop" hidden>
-        <span class="drop-icon">📄</span>
-        <span class="drop-text">Drop 2 or more PDFs here or click to choose</span>
-      </div>
-      <input type="file" id="mergeFiles" accept="application/pdf" multiple hidden>
-      <p class="hint" id="mergeFileList"></p>
-
-      <div id="addImageWrap" hidden>
-        <label for="addImageFile">Image to add (JPEG or PNG)</label>
-        <div class="drop" id="addImageDrop">
-          <span class="drop-icon">🖼</span>
-          <span class="drop-text">Drop a JPEG or PNG here or click to choose</span>
-        </div>
-        <input type="file" id="addImageFile" accept="image/jpeg,image/png" hidden>
-      </div>
-
-      <div id="rotateOpts">
-        <label for="rotateAngle">Rotate</label>
-        <select id="rotateAngle">
-          <option value="90">90° clockwise</option>
-          <option value="-90">90° counterclockwise</option>
-          <option value="180">180°</option>
-        </select>
-        <label for="rotatePages">Pages</label>
-        <input type="text" id="rotatePages" placeholder="e.g. 1,3,5-7 (blank = all pages)">
-      </div>
-      <div id="splitOpts" hidden>
-        <label for="splitRanges">Ranges</label>
-        <input type="text" id="splitRanges" placeholder="e.g. 1-3;4-6 (blank = split every page)">
-      </div>
-      <div id="deleteOpts" hidden>
-        <label for="deletePages">Pages to delete</label>
-        <input type="text" id="deletePages" placeholder="e.g. 2,4-5">
-      </div>
-      <div id="compressOpts" hidden>
-        <label for="compressQuality">JPEG quality, 1–100</label>
-        <input type="text" id="compressQuality" placeholder="blank = qpdf default">
-      </div>
-      <div id="watermarkOpts" hidden>
-        <label for="watermarkText">Watermark text</label>
-        <input type="text" id="watermarkText" placeholder="e.g. CONFIDENTIAL">
-        <label for="watermarkOpacity">Opacity, 0–1</label>
-        <input type="text" id="watermarkOpacity" placeholder="0.3">
-        <label for="watermarkFontSize">Font size (pt)</label>
-        <input type="text" id="watermarkFontSize" placeholder="48">
-        <label for="watermarkPages">Pages</label>
-        <input type="text" id="watermarkPages" placeholder="e.g. 1,3,5-7 (blank = all pages)">
-      </div>
-      <div id="cropOpts" hidden>
-        <p class="hint">Trim each side by a percentage of the page's own width/height.</p>
-        <label for="cropLeft">Left %</label>
-        <input type="text" id="cropLeft" placeholder="0">
-        <label for="cropRight">Right %</label>
-        <input type="text" id="cropRight" placeholder="0">
-        <label for="cropTop">Top %</label>
-        <input type="text" id="cropTop" placeholder="0">
-        <label for="cropBottom">Bottom %</label>
-        <input type="text" id="cropBottom" placeholder="0">
-        <label for="cropPages">Pages</label>
-        <input type="text" id="cropPages" placeholder="e.g. 1,3,5-7 (blank = all pages)">
-      </div>
-      <div id="addImageOpts" hidden>
-        <label for="addImageWidth">Width, % of page</label>
-        <input type="text" id="addImageWidth" placeholder="40">
-        <label for="addImagePosition">Position</label>
-        <select id="addImagePosition">
-          <option value="center">Center</option>
-          <option value="top-left">Top left</option>
-          <option value="top-right">Top right</option>
-          <option value="bottom-left">Bottom left</option>
-          <option value="bottom-right">Bottom right</option>
-        </select>
-        <label for="addImagePages">Pages</label>
-        <input type="text" id="addImagePages" placeholder="e.g. 1,3,5-7 (blank = page 1 only)">
-      </div>
-      <div id="compressImagesOpts" hidden>
-        <p class="hint">Downsamples images larger than this, then re-encodes them as JPEG - a resolution-aware complement to "Compress" above, which can re-encode images but not shrink their pixel dimensions.</p>
-        <label for="compressImagesMaxDim">Max dimension, px</label>
-        <input type="text" id="compressImagesMaxDim" placeholder="1600">
-        <label for="compressImagesQuality">JPEG quality, 1–100</label>
-        <input type="text" id="compressImagesQuality" placeholder="75">
-      </div>
-
-      <button id="toolGo" disabled>Rotate PDF</button>
-      <div id="toolStatus"></div>
-    </section>
-
-    <section class="card">
-      <h2 class="card-title">Output</h2>
-      <div class="empty-preview" id="toolEmptyPreview">
-        <span class="icon">🗎</span>
-        <span>Your processed file will appear here.</span>
-      </div>
-      <div id="toolResult" style="display:none">
-        <div class="result-doc">
-          <span class="result-doc-icon" id="toolResultIcon">📄</span>
-          <div class="result-doc-info">
-            <strong id="toolResultName">result.pdf</strong>
-            <span id="toolMeta"></span>
-          </div>
-        </div>
-        <a id="toolDl" class="download-link" download="result.pdf">⬇ Download</a>
-      </div>
-    </section>
-  </div>
 </div>
 
 <script src="vendor/pdf.min.js"></script>
 <script src="theme.js"></script>
 <script src="app.js"></script>
-<script src="tools.js"></script>
 </body>
 </html>

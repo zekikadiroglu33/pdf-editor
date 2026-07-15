@@ -17,11 +17,11 @@ Backend is Go (stdlib only, zero Go dependencies); it shells out to a small numb
 - Undo: each successful edit is chainable (see below) and reversible — the "Undo" button in the toolbar reverts to the pre-edit version, up to 5 steps back in the current session.
 - Make as many edits as you want in one session without the page (or the download) refreshing on every single change: every completed edit's replacement text is highlighted in yellow directly on the rendered preview so you can review everything you've changed so far, and the Download link only appears once you click "Confirm changes" — so you always review before a file is handed to you, and any further edit or undo after confirming hides the stale download again until you re-confirm.
 - **PDF converter** (`conversion/` package, a separate module from the editor above), on its own page (`convert.html`, linked from the nav bar) with its own upload/download flow: converts a PDF to **Word (.docx), PowerPoint (.pptx), Excel (.xlsx), HTML, plain text, SVG, PNG, JPEG, TIFF, or WEBP**. The document formats are best-effort text extraction, not a layout-faithful conversion; the image formats are actual rendered pages. Being a separate page (not a tab sharing the editor's page) means it never loads PDF.js at all, since it has no interactive preview to render. See [Converting to other formats](#converting-to-other-formats) and [Limitations](#limitations-honest-ones) below.
-- **PDF Tools**, a "PDF Tools" section on the Edit page, in three tiers by how they're implemented:
+- **PDF Tools**, on its own page (`tools.html`, linked from the nav bar) with its own upload/download flow, in three tiers by how they're implemented:
   - qpdf-native (`pdfTools/pdftools.go`): **rotate**, **merge**, **split**, **delete pages**, **compress** - each a single `qpdf` invocation with the right flags/page-range syntax, since qpdf already does page selection, concatenation, and stream/image recompression better than reimplementing it here would.
   - Direct PDF editing (`pdfTools/pdfwatermark.go`/`pdfTools/pdfcrop.go`): **add watermark** (diagonal, semi-transparent text) and **crop** (percentage margins) - the same parse/mutate/rebuild technique the find/replace engine uses, since there's no qpdf flag for "draw text on a page" or "set a CropBox".
   - Image codec work (`pdfTools/pdfimage.go`, pure Go stdlib - no new dependency): **add image to PDF** (embed a JPEG/PNG onto a page) and **compress images** (downsample oversized embedded images, a resolution-aware complement to "Compress", which can't shrink pixel dimensions).
-  See [PDF Tools](#pdf-tools) below.
+  Like the converter, this page never loads PDF.js, since none of these tools render an interactive preview. See [PDF Tools](#pdf-tools) below.
 
 ## Prerequisites
 
@@ -259,7 +259,7 @@ If `pdftoppm` (or, for `webp`, `cwebp`) isn't installed, requesting one of these
 
 ### PDF Tools
 
-The "PDF Tools" section on the Edit page has nine tools across three implementation tiers. First, `pdfTools/pdftools.go`'s qpdf-native tier: rotate, merge, split, delete pages, compress. None of these touch this project's own hand-rolled PDF object parser at all - each is just one `qpdf` invocation with the right flags or page-range syntax, since qpdf already handles page selection/concatenation/recompression more robustly than reimplementing it here would:
+The "PDF Tools" page (`tools.html`, linked from the nav bar) has nine tools across three implementation tiers. First, `pdfTools/pdftools.go`'s qpdf-native tier: rotate, merge, split, delete pages, compress. None of these touch this project's own hand-rolled PDF object parser at all - each is just one `qpdf` invocation with the right flags or page-range syntax, since qpdf already handles page selection/concatenation/recompression more robustly than reimplementing it here would:
 
 - **Rotate** — `qpdf --rotate=[+|-]angle:page-range in.pdf out.pdf`. The angle is always passed with an explicit sign (relative rotation, e.g. `+90`/`-90`), matching qpdf's own recommended usage.
 - **Merge** — `qpdf --empty --pages file1.pdf file2.pdf ... -- out.pdf`, concatenating every input's pages in upload order.
@@ -363,12 +363,13 @@ pdf-editor/
 ├── Caddyfile
 ├── .env.example
 └── static/
-    ├── index.html           # Editor page markup (Edit + PDF Tools) - links style.css, loads pdf.js + theme.js + app.js + tools.js
+    ├── index.html           # Editor page markup (Edit) - links style.css, loads pdf.js + theme.js + app.js
     ├── convert.html          # Converter page markup - links style.css, loads only theme.js + convert.js (no pdf.js)
-    ├── style.css             # shared design system (theme vars, layout, cards, buttons, form controls) for both pages
-    ├── theme.js              # shared light/dark toggle logic for both pages
+    ├── tools.html            # PDF Tools page markup - links style.css, loads only theme.js + tools.js (no pdf.js)
+    ├── style.css             # shared design system (theme vars, layout, cards, buttons, form controls) for all three pages
+    ├── theme.js              # shared light/dark toggle logic for all three pages
     ├── app.js                # Editor page logic: PDF.js preview, drag-to-select, click-to-edit, zoom, undo
-    ├── tools.js              # PDF Tools logic: rotate/merge/split/delete-pages/compress/watermark/crop/add-image/compress-images
+    ├── tools.js              # PDF Tools page logic: rotate/merge/split/delete-pages/compress/watermark/crop/add-image/compress-images
     ├── convert.js            # Converter page logic: format picker, upload/convert/download
     └── vendor/
         ├── fonts/            # self-hosted Space Grotesk (OFL.txt included) - same strict-CSP reasoning as pdf.js below

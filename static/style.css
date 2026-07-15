@@ -1,7 +1,8 @@
-/* Shared design system for both pdfer pages (index.html = editor,
-   convert.html = converter) - anything specific to only one of them
-   (the PDF.js viewer/textLayer, the confirm-row, the format-grid,
-   result-doc) lives in that page's own <style> block instead. */
+/* Shared design system for all three pdfer pages (index.html = editor,
+   convert.html = converter, tools.html = PDF Tools) - anything specific
+   to only one of them (the PDF.js viewer/textLayer, the confirm-row)
+   lives in that page's own <style> block instead; format-grid/result-doc
+   are shared by convert.html and tools.html and live here. */
 
 /* Light theme is the default; dark applies automatically via the OS
    preference, and either can be pinned explicitly via data-theme (set by
@@ -198,7 +199,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 }
 .download-link:hover { filter: brightness(1.08); }
 
-/* Shared by convert.html's format picker and index.html's PDF Tools
+/* Shared by convert.html's format picker and tools.html's PDF Tools
    picker (same visual language: a grid of toggle buttons, one active). */
 .format-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .format-opt {
@@ -210,7 +211,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .format-opt:hover:not(.active) { border-color: var(--accent); }
 .format-opt.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
-/* Shared by convert.html's Output card and index.html's PDF Tools
+/* Shared by convert.html's Output card and tools.html's PDF Tools
    Output card. */
 .result-doc {
   display: flex; align-items: center; gap: 12px; margin-bottom: 14px;

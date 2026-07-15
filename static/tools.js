@@ -1,8 +1,8 @@
-// PDF Tools: rotate, merge, split, delete pages, compress - all backed by
-// qpdf's own CLI capabilities (see pdftools.go), not this app's own PDF
-// parser. A separate module from the Edit/Preview flow in app.js above:
-// its own file state, never shared with pdfFile/historyStack, since these
-// are one-shot document operations rather than a find/replace session.
+// PDF Tools (tools.html): rotate, merge, split, delete pages, compress,
+// watermark, crop, add-image, compress-images. Its own page, own file
+// state - never shared with the editor's pdfFile/historyStack in app.js,
+// since these are one-shot document operations rather than a find/replace
+// editing session (the same separation convert.js already has from app.js).
 const toolOpts = document.querySelectorAll('#toolPicker .format-opt');
 const toolDrop = document.getElementById('toolDrop');
 const toolFileIn = document.getElementById('toolFile');
