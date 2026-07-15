@@ -267,6 +267,14 @@ type badInputError struct{ msg string }
 
 func (e *badInputError) Error() string { return e.msg }
 
+// unavailableError marks a request that failed only because a required
+// external tool isn't installed on this server (e.g. pdftoppm/cwebp for
+// raster image conversion) - a deployment/environment problem, not
+// something wrong with the caller's request or the uploaded PDF.
+type unavailableError struct{ msg string }
+
+func (e *unavailableError) Error() string { return e.msg }
+
 // EditPDF is the full pipeline: normalize -> replace -> rebuild -> recompress.
 //
 // Replace is font-aware (see pdftext.go): it walks each page's actual
@@ -476,24 +484,98 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 	w.Write(edited)
 }
 
+func handleConvert(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+	if err := r.ParseMultipartForm(maxUpload); err != nil {
+		http.Error(w, "upload too large or malformed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	lang := r.FormValue("lang")
+	if lang == "" {
+		lang = "latin"
+	}
+	format := r.FormValue("format")
+	if format == "" {
+		format = "docx"
+	}
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "missing file field", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	pdf, err := io.ReadAll(file)
+	if err != nil || !bytes.HasPrefix(pdf, []byte("%PDF")) {
+		http.Error(w, "not a valid PDF file", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
+	defer cancel()
+	data, pages, contentType, filename, err := ConvertPDF(ctx, pdf, lang, format)
+	if err != nil {
+		var bad *badInputError
+		if errors.As(err, &bad) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		var unavail *unavailableError
+		if errors.As(err, &unavail) {
+			log.Printf("convert unavailable: %v", err)
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		log.Printf("convert failed (%d byte upload): %v", len(pdf), err)
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	log.Printf("converted to %s: %d page(s), %d -> %d bytes", format, pages, len(pdf), len(data))
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("X-Pages", strconv.Itoa(pages))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Write(data)
+}
+
 func main() {
 	if _, err := exec.LookPath("qpdf"); err != nil {
 		log.Fatal("qpdf not found in PATH - install it first (apt install qpdf / brew install qpdf)")
 	}
+	// pdftoppm/cwebp are only needed for the raster image output formats
+	// (png/jpeg/tiff/webp) - unlike qpdf, their absence doesn't break the
+	// rest of the app, so it's a warning, not a fatal error; requests for
+	// those formats fail individually with a clear message (see
+	// convert_raster.go) if the tool turns out to be missing.
+	if _, err := exec.LookPath("pdftoppm"); err != nil {
+		log.Print("warning: pdftoppm not found in PATH - PNG/JPEG/TIFF/WEBP conversion will be unavailable (install poppler-utils / poppler)")
+	}
+	if _, err := exec.LookPath("cwebp"); err != nil {
+		log.Print("warning: cwebp not found in PATH - WEBP conversion will be unavailable (install webp)")
+	}
 
 	static, _ := fs.Sub(staticFS, "static")
 
-	// /api/edit is the expensive, abuse-prone route: rate-limited per IP
-	// and concurrency-limited process-wide, since each call spawns two
-	// qpdf subprocesses. The static file server and /api/health stay
-	// unrestricted.
+	// /api/edit and /api/convert are the expensive, abuse-prone routes:
+	// rate-limited per IP and concurrency-limited process-wide, since each
+	// call spawns at least one qpdf subprocess. The static file server and
+	// /api/health stay unrestricted. Each route gets its own limiter so a
+	// burst of conversions can't starve edit requests or vice versa.
 	editLimiter := newConcurrencyLimiter(8)
 	rateLimiter := newRateLimiter(0.5, 15) // ~1 edit/2s sustained, burst 15, per IP
 	editHandler := editLimiter.middleware(rateLimitMiddleware(rateLimiter, http.HandlerFunc(handleEdit)))
 
+	convertLimiter := newConcurrencyLimiter(8)
+	convertRateLimiter := newRateLimiter(0.5, 15)
+	convertHandler := convertLimiter.middleware(rateLimitMiddleware(convertRateLimiter, http.HandlerFunc(handleConvert)))
+
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(static)))
 	mux.Handle("/api/edit", editHandler)
+	mux.Handle("/api/convert", convertHandler)
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte("ok"))
 	})

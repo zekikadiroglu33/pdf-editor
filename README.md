@@ -4,7 +4,7 @@
 
 A small, self-contained web service that edits text inside PDF files: upload a PDF, select or type the text to find, type its replacement, and download the edited PDF. Includes a browser UI with a PDF.js-powered preview — drag-select text directly on the rendered page instead of retyping it.
 
-Backend is Go (stdlib only, zero dependencies); the only external tool required is `qpdf`.
+Backend is Go (stdlib only, zero Go dependencies); it shells out to a small number of external CLI tools, the same way it always has for `qpdf` (see Prerequisites).
 
 ## Features
 
@@ -15,14 +15,21 @@ Backend is Go (stdlib only, zero dependencies); the only external tool required 
 - Optional regex find/replace: check "Use regex" to treat "Find text" as a Go regexp (RE2 — immune to catastrophic backtracking regardless of the pattern) matched against the document's actual text, with capture-group expansion in the replacement (`$1`, `${name}`, ...). Drag-to-select is literal-only and is disabled while regex mode is on, since occurrence targeting doesn't carry over to arbitrary patterns.
 - Undo: each successful edit is chainable (see below) and reversible — the "Undo" button in the toolbar reverts to the pre-edit version, up to 5 steps back in the current session.
 - Make as many edits as you want in one session without the page (or the download) refreshing on every single change: every completed edit's replacement text is highlighted in yellow directly on the rendered preview so you can review everything you've changed so far, and the Download link only appears once you click "Confirm changes" — so you always review before a file is handed to you, and any further edit or undo after confirming hides the stale download again until you re-confirm.
+- **PDF converter** (`convert*.go`, a separate module from the editor above): a "Convert" tab with its own upload/download flow converts a PDF to **Word (.docx), PowerPoint (.pptx), Excel (.xlsx), HTML, plain text, SVG, PNG, JPEG, TIFF, or WEBP**. The document formats are best-effort text extraction, not a layout-faithful conversion; the image formats are actual rendered pages. See [Converting to other formats](#converting-to-other-formats) and [Limitations](#limitations-honest-ones) below.
 
 ## Prerequisites
 
 - Go 1.21+ (tested on 1.22+)
-- `qpdf` CLI:
+- `qpdf` CLI (required — the app won't start without it):
   - macOS: `brew install qpdf`
   - Debian/Ubuntu: `apt install qpdf`
   - Windows: [qpdf releases](https://github.com/qpdf/qpdf/releases)
+- `pdftoppm` (from poppler), optional — only needed for the PNG/JPEG/TIFF/WEBP conversion formats; every other feature (editing, and the docx/pptx/xlsx/html/txt/svg conversions) works without it. Its absence only disables those four formats (a clear error is returned if you request one), it doesn't stop the server from starting.
+  - macOS: `brew install poppler`
+  - Debian/Ubuntu: `apt install poppler-utils`
+- `cwebp` (from webp), optional — only needed for the WEBP conversion format specifically (poppler can rasterize directly to PNG/JPEG/TIFF, but not WEBP, so WEBP output is produced by rendering to PNG and re-encoding with `cwebp`).
+  - macOS: `brew install webp`
+  - Debian/Ubuntu: `apt install webp`
 
 ## How to run
 
@@ -99,6 +106,7 @@ Measured with a synthetic ~46 MB PDF (near the 50 MB upload cap): a single edit 
 | `/` | GET | — | Web UI |
 | `/api/health` | GET | — | `ok` |
 | `/api/edit` | POST | multipart form: `file` (PDF, max 50 MB), `find` (required), `replace`, `lang` (optional: `latin` default, or `turkish`), `regex` (optional: `true` to treat `find` as a regexp), `page`/`occurrence` (optional: target a single match) | Edited PDF bytes; header `X-Replacements: N` |
+| `/api/convert` | POST | multipart form: `file` (PDF, max 50 MB), `format` (optional: `docx` default, or `pptx`/`xlsx`/`html`/`txt`/`svg`/`png`/`jpeg`/`tiff`/`webp`), `lang` (optional: `latin` default, or `turkish` — only affects decoding simple-font bytes, see `encoding.go`; ignored for the image formats, which don't decode text at all) | Converted file bytes (content type/filename match `format`; a multi-page image conversion instead returns a `.zip` of one image per page — see below); header `X-Pages: N` |
 
 Example with curl:
 
@@ -134,13 +142,65 @@ curl -o edited.pdf \
 
 Note: with `curl -F`, escape/avoid literal parentheses in the field value or use `--form-string` instead of `-F` — curl's own multipart syntax treats unescaped `(`/`,` specially in `-F` values. This only affects the `curl` CLI, not the browser UI (which uses `FormData` and sends field values literally).
 
-Errors return plain text with status 400 (bad input — including an unknown `lang`, an invalid regex, or a character unsupported by the selected language) or 422 (PDF could not be processed).
+Converting to Word (the default format):
+
+```bash
+curl -o converted.docx \
+  -F file=@report.pdf \
+  http://localhost:8080/api/convert
+```
+
+Converting to another format — pass `format`:
+
+```bash
+curl -o converted.pptx -F file=@report.pdf -F 'format=pptx' http://localhost:8080/api/convert
+curl -o converted.xlsx -F file=@report.pdf -F 'format=xlsx' http://localhost:8080/api/convert
+curl -o converted.html -F file=@report.pdf -F 'format=html' http://localhost:8080/api/convert
+curl -o converted.txt  -F file=@report.pdf -F 'format=txt'  http://localhost:8080/api/convert
+curl -o converted.svg  -F file=@report.pdf -F 'format=svg'  http://localhost:8080/api/convert
+```
+
+Converting to an image format (requires `pdftoppm`, and `cwebp` for `webp` — see Prerequisites). A single-page PDF downloads as one image; a multi-page PDF downloads as a `.zip` of `page-1.<ext>`, `page-2.<ext>`, ... instead, since there's no single-image container to merge pages into:
+
+```bash
+curl -o converted.png  -F file=@report.pdf -F 'format=png'  http://localhost:8080/api/convert
+curl -o converted.jpg  -F file=@report.pdf -F 'format=jpeg' http://localhost:8080/api/convert
+curl -o converted.tif  -F file=@report.pdf -F 'format=tiff' http://localhost:8080/api/convert
+curl -o converted.webp -F file=@report.pdf -F 'format=webp' http://localhost:8080/api/convert
+```
+
+Errors return plain text with status 400 (bad input — including an unknown `lang`, an unknown `format`, an invalid regex, or a character unsupported by the selected language), 422 (PDF could not be processed), or 503 (an image format was requested but `pdftoppm`/`cwebp` isn't installed on this server — see Prerequisites).
 
 ## How it works
 
 1. **Normalize** — `qpdf` rewrites the upload as a classic PDF: object streams disabled, content streams uncompressed, so text operators (`(Hello) Tj`) become plain bytes.
 2. **Replace** — the `find`/`replace` strings are transcoded from UTF-8 into the selected language's single-byte encoding (see `encoding.go`), then matched and replaced inside every non-image stream, with `/Length` updated.
 3. **Rebuild** — the file is re-serialized with a fresh `xref` table and trailer, then recompressed with `qpdf`.
+
+### Converting to other formats
+
+`convert.go` and its per-format siblings (`convert_docx.go`, `convert_pptx.go`, `convert_xlsx.go`, `convert_html.go`, `convert_txt.go`, `convert_svg.go`) are a separate module from the find/replace engine above — they don't edit the PDF at all, they read it. PDF has no concept of a paragraph: a content stream only positions individual strings on the page via `Tf`/`Td`/`Tm`/`TL`/`T*` operators. The pipeline (`convert.go`):
+
+1. Normalizes the upload with `qpdf`, same as editing.
+2. Walks the page tree and, for each page, decodes its actual text (reusing the same simple-font/CID-`/ToUnicode` font resolution as the editor), while additionally tracking the text line matrix's Y position and the current leading — enough to know where each line sits vertically without doing full matrix math (real-world PDFs essentially never rotate or skew text).
+3. Groups consecutive lines into paragraphs with the same heuristic tools like `pdftotext -layout` use: a same-line gap (an inline font-size change, e.g. a bold word mid-sentence) concatenates directly, an ordinary line-wrap gap (roughly one line height) joins with a space, and anything bigger (or a move back up the page) starts a new paragraph. Also resolves each page's `/MediaBox` (with inheritance), used only by the SVG output.
+4. Hands the resulting per-page paragraph lists to the requested format's builder, one file per `format`:
+   - **docx** — minimal OOXML WordprocessingML, one `<w:p>` per paragraph, an explicit page break between pages.
+   - **pptx** — minimal OOXML PresentationML: one slide per page, all paragraphs in a single autofit text box (PowerPoint/LibreOffice/Keynote reflow and shrink the text themselves). Requires the usual slide-master/layout/theme boilerplate PowerPoint's schema needs even for a blank design.
+   - **xlsx** — minimal OOXML SpreadsheetML: one worksheet per page ("Page 1", "Page 2", ...), one row per paragraph in column A, using inline strings (no shared-strings table needed).
+   - **html** — paragraphs as `<p>` tags with a dashed, print-`page-break`-marked `<hr>` between pages.
+   - **txt** — paragraphs separated by blank lines, pages separated by a form-feed (`\f`), the conventional plain-text page-break character.
+   - **svg** — the one format with no native text reflow, so paragraphs are manually word-wrapped (`wrapText` in `convert.go`) to the page's actual width; all pages are stacked into a single tall canvas so a multi-page PDF still downloads as one file.
+
+  All OOXML formats (docx/xlsx/pptx) are zips of small XML parts built with the standard library's `archive/zip` — no third-party document library.
+
+**png/jpeg/tiff/webp are a completely different pipeline** (`convert_raster.go`), because they're the one place this app produces actual pixels instead of extracted text — and text extraction has no way to draw a page, only to read what's in it. Instead of the paragraph pipeline above, these formats:
+
+1. Shell out to `pdftoppm` (from poppler, an external CLI dependency exactly like `qpdf` - see Prerequisites) to rasterize the page directly at 150 DPI, straight from the original upload — no `qpdf` normalize step needed here, since poppler's own parser already handles compressed/object-stream PDFs that this project's hand-rolled parser can't.
+2. For `webp` specifically (which `pdftoppm` can't write directly): render to PNG first, then re-encode with `cwebp` (the reference libwebp encoder).
+3. Return the result directly if the PDF had one page; zip all pages together (`page-1.<ext>`, `page-2.<ext>`, ...) if it had more than one, since (unlike text, which can just be concatenated) merging several page images into one file would need an image-decoding/compositing library this project doesn't have.
+
+If `pdftoppm` (or, for `webp`, `cwebp`) isn't installed, requesting one of these four formats fails with a clear `503` error rather than crashing the server — every other feature keeps working normally.
 
 ## Limitations (honest ones)
 
@@ -152,6 +212,8 @@ Errors return plain text with status 400 (bad input — including an unknown `la
 - **Regex mode and mouse-selection targeting don't combine**: drag-to-select occurrence targeting counts matches by plain substring search, which doesn't correspond to how a regex pattern matches, so the UI disables drag-to-select while "Use regex" is checked (regex mode always replaces every match in the document).
 - **Undo is in-memory and per-tab**: it steps back through the last 5 versions held in the browser tab's memory, not a server-side history — closing/reloading the tab loses it, same as the original upload if not downloaded.
 - **Change highlighting is a review aid, not a ground truth**: it's a browser-side overlay (nothing is written into the PDF itself) that marks any rendered text span containing a session edit's replacement text. There's no per-edit position tracking, so it can occasionally highlight an unrelated pre-existing occurrence of the same text, and it's skipped entirely for regex-mode edits (the replacement text differs per match, so there's no single fixed string to look for).
+- **PDF conversion to a document format (docx/pptx/xlsx/html/txt/svg) is best-effort text extraction, not layout reconstruction**: paragraphs are inferred from vertical line spacing (see "Converting to other formats" above), so multi-column layouts, tables, and precise indentation are not reproduced — everything comes out as a linear sequence of paragraphs (or, for xlsx, rows), per page. Embedded images aren't carried over at all in these formats. It shares the same CID/`/ToUnicode` and font-encoding limitations as find/replace, described above.
+- **Raster image export (PNG/JPEG/TIFF/WEBP) requires `pdftoppm`/`cwebp` to be installed** (see Prerequisites) — unlike every other feature in this app, it isn't optional-dependency-free, since actually rendering a page's pixels needs a real PDF renderer, not text extraction. It also doesn't apply the `lang` setting at all (there's no text decoding involved), and a multi-page PDF comes back as a `.zip` of one image per page rather than a single file (see "Converting to other formats" above).
 
 ## Project structure
 
@@ -161,10 +223,19 @@ pdf-editor/
 ├── main.go                 # HTTP server + PDF parse/rebuild/qpdf pipeline
 ├── middleware.go            # panic recovery, logging, security headers, rate/concurrency limiting
 ├── pdftext.go               # font-aware content-stream tokenizer, decoder, and find/replace engine
+├── convert.go               # shared PDF -> paragraphs pipeline + format dispatch
+├── convert_docx.go           # .docx (Word) writer
+├── convert_pptx.go           # .pptx (PowerPoint) writer
+├── convert_xlsx.go           # .xlsx (Excel) writer
+├── convert_html.go           # .html writer
+├── convert_txt.go            # .txt writer
+├── convert_svg.go            # .svg writer
+├── convert_raster.go         # .png/.jpeg/.tiff/.webp writer (shells out to pdftoppm/cwebp - see Prerequisites)
 ├── encoding.go              # rune <-> byte tables per language (latin, turkish, ...)
 ├── fallbackfont.go           # bundled fallback-font PDF object builder
 ├── fallbackfont_data.go      # generated widths/metrics for the fallback font
 ├── pdfer_test.go             # regression tests (programmatically-built fixture PDFs)
+├── convert_test.go           # regression tests for the PDF converter (all output formats)
 ├── Dockerfile
 ├── docker-compose.yml         # pdfer + Caddy (reverse proxy, automatic HTTPS) for VPS deploys
 ├── Caddyfile

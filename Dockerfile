@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /pdfer .
 # --- runtime stage -------------------------------------------------------
 FROM debian:bookworm-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends qpdf ca-certificates curl \
+ && apt-get install -y --no-install-recommends qpdf poppler-utils webp ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --system --uid 10001 --home-dir /nonexistent --shell /usr/sbin/nologin pdfer

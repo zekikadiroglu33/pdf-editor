@@ -19,6 +19,7 @@ const confirmBtn = document.getElementById('confirmBtn');
 const pendingCount = document.getElementById('pendingCount');
 const emptyPreview = document.getElementById('emptyPreview');
 const themeToggle = document.getElementById('themeToggle');
+const tabs = document.querySelectorAll('.tab');
 const MIN_SCALE = 0.5, MAX_SCALE = 5, ZOOM_STEP = 0.25;
 const MAX_HISTORY = 5; // capped so undo can't grow unbounded memory on large PDFs
 let pdfFile = null;
@@ -54,6 +55,21 @@ themeToggle.addEventListener('click', () => {
   const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   localStorage.setItem(THEME_KEY, next);
   applyTheme(next);
+});
+
+// Edit and Convert are two independent tools sharing one page; only one
+// panel is shown at a time so the layout stays focused instead of stacking
+// both tools' cards on top of each other.
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => {
+      t.classList.toggle('active', t === tab);
+      t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+    });
+    document.querySelectorAll('.panel').forEach(p => {
+      p.hidden = p.id !== tab.dataset.panel;
+    });
+  });
 });
 
 function updateUndoButton() {
@@ -381,5 +397,121 @@ go.addEventListener('click', async () => {
     setStatus('Error: ' + err.message, 'err');
   } finally {
     go.disabled = false;
+  }
+});
+
+// --- PDF -> Word converter -------------------------------------------------
+// A separate module from the Edit/Preview flow above: its own file (never
+// shared with pdfFile/historyStack), its own drop zone, and its own status
+// line, since converting a document has nothing to do with the find/replace
+// editing session.
+const convDrop = document.getElementById('convDrop');
+const convFileIn = document.getElementById('convFile');
+const convGo = document.getElementById('convGo');
+const convStatus = document.getElementById('convStatus');
+const convDl = document.getElementById('convDl');
+const convLang = document.getElementById('convLang');
+const convEmptyPreview = document.getElementById('convEmptyPreview');
+const convResult = document.getElementById('convResult');
+const convMeta = document.getElementById('convMeta');
+const convResultIcon = document.getElementById('convResultIcon');
+const convResultName = document.getElementById('convResultName');
+const formatOpts = document.querySelectorAll('.format-opt');
+const rasterHint = document.getElementById('rasterHint');
+const rasterFormats = new Set(['png', 'jpeg', 'tiff', 'webp']);
+let convFile = null;
+let convFormat = document.querySelector('.format-opt.active').dataset.format;
+
+const setConvStatus = (msg, cls = '') => { convStatus.textContent = msg; convStatus.className = cls; };
+
+// The format picker is a row of toggle buttons (not a <select>) so each
+// format's icon is visible at a glance; only one can be active at a time.
+formatOpts.forEach(opt => {
+  opt.addEventListener('click', () => {
+    formatOpts.forEach(o => o.classList.toggle('active', o === opt));
+    convFormat = opt.dataset.format;
+    convGo.textContent = `Convert to ${opt.dataset.ext}`;
+    rasterHint.style.display = rasterFormats.has(convFormat) ? 'block' : 'none';
+    convResult.style.display = 'none';
+    convEmptyPreview.style.display = 'flex';
+    setConvStatus('');
+  });
+});
+
+const setConvFile = f => {
+  if (!f || f.type !== 'application/pdf') { setConvStatus('Please choose a PDF file.', 'err'); return; }
+  convFile = f;
+  convResult.style.display = 'none';
+  convEmptyPreview.style.display = 'flex';
+  setConvStatus('');
+
+  // Built via DOM methods (not innerHTML) so an unusual filename can't be
+  // interpreted as markup.
+  convDrop.innerHTML = '';
+  const icon = document.createElement('span');
+  icon.className = 'drop-icon';
+  icon.textContent = '📄';
+  const text = document.createElement('span');
+  text.className = 'drop-text';
+  text.textContent = `${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  convDrop.append(icon, text);
+  convDrop.classList.add('hasfile');
+
+  convGo.disabled = false;
+};
+
+convDrop.addEventListener('click', () => convFileIn.click());
+convFileIn.addEventListener('change', () => setConvFile(convFileIn.files[0]));
+convDrop.addEventListener('dragover', e => { e.preventDefault(); convDrop.classList.add('over'); });
+convDrop.addEventListener('dragleave', () => convDrop.classList.remove('over'));
+convDrop.addEventListener('drop', e => {
+  e.preventDefault(); convDrop.classList.remove('over');
+  setConvFile(e.dataTransfer.files[0]);
+});
+
+convGo.addEventListener('click', async () => {
+  if (!convFile) return;
+
+  const activeOpt = document.querySelector('.format-opt.active');
+
+  const form = new FormData();
+  form.append('file', convFile);
+  form.append('lang', convLang.value);
+  form.append('format', convFormat);
+
+  convGo.disabled = true;
+  convResult.style.display = 'none';
+  setConvStatus('Converting…');
+
+  try {
+    const res = await fetch('/api/convert', { method: 'POST', body: form });
+    if (!res.ok) throw new Error(await res.text());
+
+    const pages = res.headers.get('X-Pages') || '0';
+    // The actual filename is read from the response, not assumed from the
+    // picked format: a multi-page image conversion comes back as
+    // converted_<format>.zip instead of converted.<ext> (see
+    // convert_raster.go), and this way the UI never has to know that rule.
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename="?([^";]+)"?/);
+    const filename = filenameMatch ? filenameMatch[1] : `converted${activeOpt.dataset.ext}`;
+    const isZip = filename.endsWith('.zip');
+
+    const blob = await res.blob();
+    convDl.href = URL.createObjectURL(blob);
+    convDl.download = filename;
+    convDl.textContent = `⬇ Download ${filename}`;
+    convResultIcon.textContent = isZip ? '📦' : activeOpt.dataset.icon;
+    convResultName.textContent = filename;
+    convMeta.textContent = isZip
+      ? `${pages} page(s) converted (one image per page, zipped)`
+      : `${pages} page(s) converted`;
+    convEmptyPreview.style.display = 'none';
+    convResult.style.display = 'block';
+    setConvStatus(`Done — converted ${pages} page(s) to ${filename}.`, 'ok');
+  } catch (err) {
+    setConvStatus('Error: ' + err.message, 'err');
+  } finally {
+    convGo.disabled = false;
   }
 });
