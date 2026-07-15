@@ -11,8 +11,8 @@
 // (the reference libwebp encoder). Neither tool is required for any other
 // conversion format or for editing, so their absence only disables these
 // four formats (see the pdftoppm/cwebp checks in main's startup and
-// unavailableError below), not the whole server.
-package main
+// pdfcore.UnavailableError below), not the whole server.
+package conversion
 
 import (
 	"archive/zip"
@@ -24,11 +24,13 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
+
+	"pdfer/pdfcore"
 )
 
 // rasterTimeout bounds each pdftoppm/cwebp subprocess call, same
-// reasoning as qpdfTimeout: without it, a pathological upload could hang
-// a worker (and its concurrency slot) indefinitely.
+// reasoning as pdfcore.QpdfTimeout: without it, a pathological upload
+// could hang a worker (and its concurrency slot) indefinitely.
 const rasterTimeout = 40 * time.Second
 
 const rasterDPI = "150"
@@ -51,11 +53,11 @@ var rasterContentType = map[string]string{
 }
 
 // runRasterTool runs an external image-conversion command with a bounded
-// timeout, translating "not installed" into an unavailableError (a
-// deployment problem) rather than a generic failure.
+// timeout, translating "not installed" into a pdfcore.UnavailableError
+// (a deployment problem) rather than a generic failure.
 func runRasterTool(ctx context.Context, name string, args ...string) error {
 	if _, err := exec.LookPath(name); err != nil {
-		return &unavailableError{fmt.Sprintf("%s is not installed on this server - required for this output format", name)}
+		return &pdfcore.UnavailableError{Msg: fmt.Sprintf("%s is not installed on this server - required for this output format", name)}
 	}
 	ctx, cancel := context.WithTimeout(ctx, rasterTimeout)
 	defer cancel()
@@ -98,15 +100,16 @@ func pngToWebP(ctx context.Context, png []byte) ([]byte, error) {
 	return os.ReadFile(out.Name())
 }
 
-// rasterizePDF renders every page of pdf to the requested image format
+// RasterizePDF renders every page of pdf to the requested image format
 // via pdftoppm (rendering to PNG first, then to WEBP via cwebp, for the
 // one format pdftoppm can't write directly), returning one image per
 // page in page order. It rasterizes the caller's original upload
 // directly - unlike the text-extraction formats, this never needs
 // qpdf's normalize step, since poppler (unlike this project's own
 // hand-rolled object parser) already handles compressed/object-stream
-// PDFs natively.
-func rasterizePDF(ctx context.Context, pdf []byte, format string) ([][]byte, error) {
+// PDFs natively. Exported since pdfTools' image tests call it directly
+// to verify AddImageToPDF's output actually renders correctly.
+func RasterizePDF(ctx context.Context, pdf []byte, format string) ([][]byte, error) {
 	in, err := os.CreateTemp("", "pdfer-raster-in-*.pdf")
 	if err != nil {
 		return nil, err
@@ -199,7 +202,7 @@ func zipRasterPages(images [][]byte, format string) ([]byte, error) {
 // directly (single-page PDF) or a zip of all pages (multi-page), along
 // with the content type/filename appropriate to whichever it produced.
 func convertPDFToRaster(ctx context.Context, pdf []byte, format string) (data []byte, pageCount int, contentType, filename string, err error) {
-	images, err := rasterizePDF(ctx, pdf, format)
+	images, err := RasterizePDF(ctx, pdf, format)
 	if err != nil {
 		return nil, 0, "", "", err
 	}

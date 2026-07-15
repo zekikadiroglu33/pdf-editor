@@ -1,5 +1,5 @@
 // Regression tests for the PDF -> various-format converter (convert*.go).
-package main
+package conversion
 
 import (
 	"archive/zip"
@@ -7,24 +7,12 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os/exec"
 	"strings"
 	"testing"
+
+	"pdfer/pdfcore"
+	"pdfer/pdftestutil"
 )
-
-func requirePdftoppm(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("pdftoppm"); err != nil {
-		t.Skip("pdftoppm not installed - skipping (install poppler-utils / poppler to run this test)")
-	}
-}
-
-func requireCwebp(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("cwebp"); err != nil {
-		t.Skip("cwebp not installed - skipping (install webp to run this test)")
-	}
-}
 
 // zipPart unzips a converted OOXML file (docx/xlsx/pptx) and returns the
 // named part's contents as a string, for substring assertions.
@@ -57,8 +45,8 @@ func docxDocumentXML(t *testing.T, docx []byte) string {
 }
 
 func TestConvertLineWrapMergesIntoOneParagraph(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF(
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF(
 		"BT /F1 12 Tf 72 700 Td (First line of paragraph one.) Tj\n" +
 			"0 -14 Td (Second line continuing paragraph one.) Tj\n" +
 			"0 -28 Td (This starts paragraph two after a blank line.) Tj ET\n")
@@ -88,8 +76,8 @@ func TestConvertLineWrapMergesIntoOneParagraph(t *testing.T) {
 }
 
 func TestConvertMultiPageInsertsPageBreak(t *testing.T) {
-	requireQpdf(t)
-	objs := []testObj{
+	pdftestutil.RequireQpdf(t)
+	objs := []pdftestutil.TestObj{
 		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
 		{Dict: "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>"},
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
@@ -98,7 +86,7 @@ func TestConvertMultiPageInsertsPageBreak(t *testing.T) {
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>"},
 		{Stream: []byte("BT /F1 12 Tf 72 700 Td (Page two text.) Tj ET\n"), Dict: "<<>>"},
 	}
-	pdf := buildTestPDF(objs, 1)
+	pdf := pdftestutil.BuildTestPDF(objs, 1)
 
 	docx, pages, _, _, err := ConvertPDF(context.Background(), pdf, "latin", "docx")
 	if err != nil {
@@ -121,34 +109,34 @@ func TestConvertMultiPageInsertsPageBreak(t *testing.T) {
 }
 
 func TestConvertBadLangReturnsBadInput(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
 	_, _, _, _, err := ConvertPDF(context.Background(), pdf, "klingon", "docx")
 	if err == nil {
 		t.Fatal("expected an error for an unsupported language")
 	}
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if !errors.As(err, &bad) {
-		t.Fatalf("expected a badInputError, got %T: %v", err, err)
+		t.Fatalf("expected a BadInputError, got %T: %v", err, err)
 	}
 }
 
 func TestConvertBadFormatReturnsBadInput(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
 	_, _, _, _, err := ConvertPDF(context.Background(), pdf, "latin", "pdf")
 	if err == nil {
 		t.Fatal("expected an error for an unsupported format")
 	}
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if !errors.As(err, &bad) {
-		t.Fatalf("expected a badInputError, got %T: %v", err, err)
+		t.Fatalf("expected a BadInputError, got %T: %v", err, err)
 	}
 }
 
 func TestConvertToTxtUsesFormFeedPageBreak(t *testing.T) {
-	requireQpdf(t)
-	objs := []testObj{
+	pdftestutil.RequireQpdf(t)
+	objs := []pdftestutil.TestObj{
 		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
 		{Dict: "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>"},
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
@@ -157,7 +145,7 @@ func TestConvertToTxtUsesFormFeedPageBreak(t *testing.T) {
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>"},
 		{Stream: []byte("BT /F1 12 Tf 72 700 Td (Page two text.) Tj ET\n"), Dict: "<<>>"},
 	}
-	pdf := buildTestPDF(objs, 1)
+	pdf := pdftestutil.BuildTestPDF(objs, 1)
 
 	data, pages, contentType, filename, err := ConvertPDF(context.Background(), pdf, "latin", "txt")
 	if err != nil {
@@ -179,8 +167,8 @@ func TestConvertToTxtUsesFormFeedPageBreak(t *testing.T) {
 }
 
 func TestConvertToHTMLEscapesAndBreaksPages(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF(`BT /F1 12 Tf 72 700 Td (A <tag> & an ampersand) Tj ET` + "\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF(`BT /F1 12 Tf 72 700 Td (A <tag> & an ampersand) Tj ET` + "\n")
 
 	data, _, contentType, filename, err := ConvertPDF(context.Background(), pdf, "latin", "html")
 	if err != nil {
@@ -199,8 +187,8 @@ func TestConvertToHTMLEscapesAndBreaksPages(t *testing.T) {
 }
 
 func TestConvertToSVGPositionsText(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello from SVG) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello from SVG) Tj ET\n")
 
 	data, pages, contentType, filename, err := ConvertPDF(context.Background(), pdf, "latin", "svg")
 	if err != nil {
@@ -219,8 +207,8 @@ func TestConvertToSVGPositionsText(t *testing.T) {
 }
 
 func TestConvertToXlsxOneSheetPerPage(t *testing.T) {
-	requireQpdf(t)
-	objs := []testObj{
+	pdftestutil.RequireQpdf(t)
+	objs := []pdftestutil.TestObj{
 		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
 		{Dict: "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>"},
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
@@ -229,7 +217,7 @@ func TestConvertToXlsxOneSheetPerPage(t *testing.T) {
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>"},
 		{Stream: []byte("BT /F1 12 Tf 72 700 Td (Row two.) Tj ET\n"), Dict: "<<>>"},
 	}
-	pdf := buildTestPDF(objs, 1)
+	pdf := pdftestutil.BuildTestPDF(objs, 1)
 
 	data, pages, _, filename, err := ConvertPDF(context.Background(), pdf, "latin", "xlsx")
 	if err != nil {
@@ -252,8 +240,8 @@ func TestConvertToXlsxOneSheetPerPage(t *testing.T) {
 }
 
 func TestConvertToPptxOneSlidePerPage(t *testing.T) {
-	requireQpdf(t)
-	objs := []testObj{
+	pdftestutil.RequireQpdf(t)
+	objs := []pdftestutil.TestObj{
 		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
 		{Dict: "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>"},
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
@@ -262,7 +250,7 @@ func TestConvertToPptxOneSlidePerPage(t *testing.T) {
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>"},
 		{Stream: []byte("BT /F1 12 Tf 72 700 Td (Slide two text.) Tj ET\n"), Dict: "<<>>"},
 	}
-	pdf := buildTestPDF(objs, 1)
+	pdf := pdftestutil.BuildTestPDF(objs, 1)
 
 	data, pages, _, filename, err := ConvertPDF(context.Background(), pdf, "latin", "pptx")
 	if err != nil {
@@ -285,9 +273,9 @@ func TestConvertToPptxOneSlidePerPage(t *testing.T) {
 }
 
 func TestConvertToPNGSinglePage(t *testing.T) {
-	requireQpdf(t)
-	requirePdftoppm(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello raster) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdftestutil.RequirePdftoppm(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello raster) Tj ET\n")
 
 	data, pages, contentType, filename, err := ConvertPDF(context.Background(), pdf, "latin", "png")
 	if err != nil {
@@ -312,9 +300,9 @@ func minInt(a, b int) int {
 }
 
 func TestConvertToJPEGAndTIFF(t *testing.T) {
-	requireQpdf(t)
-	requirePdftoppm(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello raster) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdftestutil.RequirePdftoppm(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello raster) Tj ET\n")
 
 	cases := []struct{ format, filename, contentType string }{
 		{"jpeg", "converted.jpg", "image/jpeg"},
@@ -338,10 +326,10 @@ func TestConvertToJPEGAndTIFF(t *testing.T) {
 }
 
 func TestConvertToWebP(t *testing.T) {
-	requireQpdf(t)
-	requirePdftoppm(t)
-	requireCwebp(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello raster) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdftestutil.RequirePdftoppm(t)
+	pdftestutil.RequireCwebp(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello raster) Tj ET\n")
 
 	data, pages, contentType, filename, err := ConvertPDF(context.Background(), pdf, "latin", "webp")
 	if err != nil {
@@ -359,9 +347,9 @@ func TestConvertToWebP(t *testing.T) {
 }
 
 func TestConvertToPNGMultiPageZips(t *testing.T) {
-	requireQpdf(t)
-	requirePdftoppm(t)
-	objs := []testObj{
+	pdftestutil.RequireQpdf(t)
+	pdftestutil.RequirePdftoppm(t)
+	objs := []pdftestutil.TestObj{
 		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
 		{Dict: "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>"},
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
@@ -370,7 +358,7 @@ func TestConvertToPNGMultiPageZips(t *testing.T) {
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>"},
 		{Stream: []byte("BT /F1 12 Tf 72 700 Td (Page two.) Tj ET\n"), Dict: "<<>>"},
 	}
-	pdf := buildTestPDF(objs, 1)
+	pdf := pdftestutil.BuildTestPDF(objs, 1)
 
 	data, pages, contentType, filename, err := ConvertPDF(context.Background(), pdf, "latin", "png")
 	if err != nil {

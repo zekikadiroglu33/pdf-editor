@@ -13,11 +13,32 @@ const rotateOpts = document.getElementById('rotateOpts');
 const splitOpts = document.getElementById('splitOpts');
 const deleteOpts = document.getElementById('deleteOpts');
 const compressOpts = document.getElementById('compressOpts');
+const watermarkOpts = document.getElementById('watermarkOpts');
+const cropOpts = document.getElementById('cropOpts');
+const addImageOpts = document.getElementById('addImageOpts');
+const compressImagesOpts = document.getElementById('compressImagesOpts');
 const rotateAngle = document.getElementById('rotateAngle');
 const rotatePages = document.getElementById('rotatePages');
 const splitRanges = document.getElementById('splitRanges');
 const deletePages = document.getElementById('deletePages');
 const compressQuality = document.getElementById('compressQuality');
+const watermarkText = document.getElementById('watermarkText');
+const watermarkOpacity = document.getElementById('watermarkOpacity');
+const watermarkFontSize = document.getElementById('watermarkFontSize');
+const watermarkPages = document.getElementById('watermarkPages');
+const cropLeft = document.getElementById('cropLeft');
+const cropRight = document.getElementById('cropRight');
+const cropTop = document.getElementById('cropTop');
+const cropBottom = document.getElementById('cropBottom');
+const cropPages = document.getElementById('cropPages');
+const addImageWrap = document.getElementById('addImageWrap');
+const addImageDrop = document.getElementById('addImageDrop');
+const addImageFileIn = document.getElementById('addImageFile');
+const addImageWidth = document.getElementById('addImageWidth');
+const addImagePosition = document.getElementById('addImagePosition');
+const addImagePages = document.getElementById('addImagePages');
+const compressImagesMaxDim = document.getElementById('compressImagesMaxDim');
+const compressImagesQuality = document.getElementById('compressImagesQuality');
 const toolGo = document.getElementById('toolGo');
 const toolStatus = document.getElementById('toolStatus');
 const toolEmptyPreview = document.getElementById('toolEmptyPreview');
@@ -33,11 +54,16 @@ const TOOL_LABELS = {
   split: 'Split PDF',
   delete: 'Delete pages',
   compress: 'Compress PDF',
+  watermark: 'Add watermark',
+  crop: 'Crop PDF',
+  addimage: 'Add image',
+  compressimages: 'Compress images',
 };
 
 let currentTool = 'rotate';
 let toolFile = null;
 let mergeFiles = [];
+let addImageFile = null;
 
 const setToolStatus = (msg, cls = '') => { toolStatus.textContent = msg; toolStatus.className = cls; };
 
@@ -47,7 +73,13 @@ function hideToolResult() {
 }
 
 function updateToolGoState() {
-  toolGo.disabled = currentTool === 'merge' ? mergeFiles.length < 2 : !toolFile;
+  if (currentTool === 'merge') {
+    toolGo.disabled = mergeFiles.length < 2;
+  } else if (currentTool === 'addimage') {
+    toolGo.disabled = !toolFile || !addImageFile;
+  } else {
+    toolGo.disabled = !toolFile;
+  }
 }
 
 function selectTool(tool) {
@@ -58,10 +90,15 @@ function selectTool(tool) {
   const isMerge = tool === 'merge';
   toolDrop.hidden = isMerge;
   mergeDrop.hidden = !isMerge;
+  addImageWrap.hidden = tool !== 'addimage';
   rotateOpts.hidden = tool !== 'rotate';
   splitOpts.hidden = tool !== 'split';
   deleteOpts.hidden = tool !== 'delete';
   compressOpts.hidden = tool !== 'compress';
+  watermarkOpts.hidden = tool !== 'watermark';
+  cropOpts.hidden = tool !== 'crop';
+  addImageOpts.hidden = tool !== 'addimage';
+  compressImagesOpts.hidden = tool !== 'compressimages';
 
   hideToolResult();
   setToolStatus('');
@@ -131,6 +168,39 @@ mergeDrop.addEventListener('drop', e => {
   setMergeFiles(e.dataTransfer.files);
 });
 
+// Image-file drop, add-image only - a second file alongside the PDF
+// chosen via the shared #toolDrop above (add-image is the one tool that
+// needs two files at once).
+const setAddImageFile = f => {
+  if (!f || (f.type !== 'image/jpeg' && f.type !== 'image/png')) {
+    setToolStatus('Please choose a JPEG or PNG image.', 'err');
+    return;
+  }
+  addImageFile = f;
+  hideToolResult();
+  setToolStatus('');
+
+  addImageDrop.innerHTML = '';
+  const icon = document.createElement('span');
+  icon.className = 'drop-icon';
+  icon.textContent = '🖼';
+  const text = document.createElement('span');
+  text.className = 'drop-text';
+  text.textContent = `${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  addImageDrop.append(icon, text);
+  addImageDrop.classList.add('hasfile');
+
+  updateToolGoState();
+};
+addImageDrop.addEventListener('click', () => addImageFileIn.click());
+addImageFileIn.addEventListener('change', () => setAddImageFile(addImageFileIn.files[0]));
+addImageDrop.addEventListener('dragover', e => { e.preventDefault(); addImageDrop.classList.add('over'); });
+addImageDrop.addEventListener('dragleave', () => addImageDrop.classList.remove('over'));
+addImageDrop.addEventListener('drop', e => {
+  e.preventDefault(); addImageDrop.classList.remove('over');
+  setAddImageFile(e.dataTransfer.files[0]);
+});
+
 toolGo.addEventListener('click', async () => {
   const form = new FormData();
   let url;
@@ -154,6 +224,30 @@ toolGo.addEventListener('click', async () => {
     } else if (currentTool === 'compress') {
       if (compressQuality.value.trim()) form.append('quality', compressQuality.value.trim());
       url = '/api/compress';
+    } else if (currentTool === 'watermark') {
+      if (!watermarkText.value.trim()) { setToolStatus('Enter the watermark text.', 'err'); return; }
+      form.append('text', watermarkText.value.trim());
+      if (watermarkOpacity.value.trim()) form.append('opacity', watermarkOpacity.value.trim());
+      if (watermarkFontSize.value.trim()) form.append('fontSize', watermarkFontSize.value.trim());
+      if (watermarkPages.value.trim()) form.append('pages', watermarkPages.value.trim());
+      url = '/api/watermark';
+    } else if (currentTool === 'crop') {
+      if (cropLeft.value.trim()) form.append('left', cropLeft.value.trim());
+      if (cropRight.value.trim()) form.append('right', cropRight.value.trim());
+      if (cropTop.value.trim()) form.append('top', cropTop.value.trim());
+      if (cropBottom.value.trim()) form.append('bottom', cropBottom.value.trim());
+      if (cropPages.value.trim()) form.append('pages', cropPages.value.trim());
+      url = '/api/crop';
+    } else if (currentTool === 'addimage') {
+      form.append('image', addImageFile);
+      if (addImageWidth.value.trim()) form.append('width', addImageWidth.value.trim());
+      form.append('position', addImagePosition.value);
+      if (addImagePages.value.trim()) form.append('pages', addImagePages.value.trim());
+      url = '/api/add-image';
+    } else if (currentTool === 'compressimages') {
+      if (compressImagesMaxDim.value.trim()) form.append('maxDimension', compressImagesMaxDim.value.trim());
+      if (compressImagesQuality.value.trim()) form.append('quality', compressImagesQuality.value.trim());
+      url = '/api/compress-images';
     }
   }
 
@@ -172,6 +266,7 @@ toolGo.addEventListener('click', async () => {
     const parts = res.headers.get('X-Parts');
     const origSize = Number(res.headers.get('X-Original-Size'));
     const compSize = Number(res.headers.get('X-Compressed-Size'));
+    const imagesChanged = res.headers.get('X-Images-Changed');
 
     const blob = await res.blob();
     toolDl.href = URL.createObjectURL(blob);
@@ -184,8 +279,10 @@ toolGo.addEventListener('click', async () => {
       toolMeta.textContent = `${parts} file(s), zipped`;
     } else if (origSize && compSize) {
       const pct = Math.round((1 - compSize / origSize) * 100);
-      toolMeta.textContent = `${(origSize / 1024).toFixed(1)} KB → ${(compSize / 1024).toFixed(1)} KB`
+      let meta = `${(origSize / 1024).toFixed(1)} KB → ${(compSize / 1024).toFixed(1)} KB`
         + (pct > 0 ? ` (${pct}% smaller)` : '');
+      if (imagesChanged) meta = `${imagesChanged} image(s) resized, ` + meta;
+      toolMeta.textContent = meta;
     } else {
       toolMeta.textContent = 'Ready to download';
     }

@@ -7,7 +7,7 @@
 // rely on). A presentation still needs one slide master, one slide layout
 // and a theme even when every slide is this simple - PowerPoint's schema
 // requires the reference chain to resolve, even to boilerplate.
-package main
+package conversion
 
 import (
 	"archive/zip"

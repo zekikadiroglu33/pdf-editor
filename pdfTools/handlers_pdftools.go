@@ -1,6 +1,6 @@
 // handlers_pdftools.go - HTTP handlers for the qpdf-backed page/document
 // tools in pdftools.go: rotate, merge, split, delete pages, compress.
-package main
+package pdftools
 
 import (
 	"archive/zip"
@@ -13,12 +13,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"pdfer/pdfcore"
 )
 
 // zipNamedFiles bundles multiple files into one zip archive, preserving
-// the given order - used by handleSplit when a request produces more
+// the given order - used by HandleSplit when a request produces more
 // than one output file (the same "zip if multi, direct file if single"
-// pattern convert_raster.go already uses for multi-page image export).
+// pattern the raster image converter uses for multi-page image export).
 func zipNamedFiles(names []string, contents [][]byte) ([]byte, error) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -39,7 +41,7 @@ func zipNamedFiles(names []string, contents [][]byte) ([]byte, error) {
 
 // readPDFFormFile reads and sanity-checks one uploaded PDF from a
 // multipart form field, mirroring the same "missing file"/"not a valid
-// PDF" checks handleEdit and handleConvert already do.
+// PDF" checks the editor and converter handlers already do.
 func readPDFFormFile(r *http.Request, field string) ([]byte, error) {
 	file, _, err := r.FormFile(field)
 	if err != nil {
@@ -54,12 +56,12 @@ func readPDFFormFile(r *http.Request, field string) ([]byte, error) {
 }
 
 // writeToolError maps a pdftools.go error to the right HTTP status: a
-// badInputError (bad page range, too few files, bad angle/quality, ...)
-// is the caller's fault (400); anything else is treated as qpdf/the PDF
-// itself failing unexpectedly (422), same convention as handleEdit and
-// handleConvert.
+// pdfcore.BadInputError (bad page range, too few files, bad
+// angle/quality, ...) is the caller's fault (400); anything else is
+// treated as qpdf/the PDF itself failing unexpectedly (422), same
+// convention as the editor/converter handlers.
 func writeToolError(w http.ResponseWriter, op string, uploadSize int, err error) {
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if errors.As(err, &bad) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -74,13 +76,13 @@ func writePDFResponse(w http.ResponseWriter, filename string, data []byte) {
 	w.Write(data)
 }
 
-func handleRotate(w http.ResponseWriter, r *http.Request) {
+func HandleRotate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
-	if err := r.ParseMultipartForm(maxUpload); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, pdfcore.MaxUpload)
+	if err := r.ParseMultipartForm(pdfcore.MaxUpload); err != nil {
 		http.Error(w, "upload too large or malformed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -96,7 +98,7 @@ func handleRotate(w http.ResponseWriter, r *http.Request) {
 	}
 	pages := r.FormValue("pages")
 
-	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), pdfcore.RequestTimeout)
 	defer cancel()
 	rotated, err := RotatePDF(ctx, pdf, pages, angle)
 	if err != nil {
@@ -107,13 +109,13 @@ func handleRotate(w http.ResponseWriter, r *http.Request) {
 	writePDFResponse(w, "rotated.pdf", rotated)
 }
 
-func handleMerge(w http.ResponseWriter, r *http.Request) {
+func HandleMerge(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
-	if err := r.ParseMultipartForm(maxUpload); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, pdfcore.MaxUpload)
+	if err := r.ParseMultipartForm(pdfcore.MaxUpload); err != nil {
 		http.Error(w, "upload too large or malformed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -141,7 +143,7 @@ func handleMerge(w http.ResponseWriter, r *http.Request) {
 		totalSize += len(data)
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), pdfcore.RequestTimeout)
 	defer cancel()
 	merged, err := MergePDFs(ctx, pdfs)
 	if err != nil {
@@ -152,13 +154,13 @@ func handleMerge(w http.ResponseWriter, r *http.Request) {
 	writePDFResponse(w, "merged.pdf", merged)
 }
 
-func handleSplit(w http.ResponseWriter, r *http.Request) {
+func HandleSplit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
-	if err := r.ParseMultipartForm(maxUpload); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, pdfcore.MaxUpload)
+	if err := r.ParseMultipartForm(pdfcore.MaxUpload); err != nil {
 		http.Error(w, "upload too large or malformed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -176,7 +178,7 @@ func handleSplit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), pdfcore.RequestTimeout)
 	defer cancel()
 	parts, err := SplitPDF(ctx, pdf, ranges)
 	if err != nil {
@@ -206,13 +208,13 @@ func handleSplit(w http.ResponseWriter, r *http.Request) {
 	w.Write(zipped)
 }
 
-func handleDeletePages(w http.ResponseWriter, r *http.Request) {
+func HandleDeletePages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
-	if err := r.ParseMultipartForm(maxUpload); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, pdfcore.MaxUpload)
+	if err := r.ParseMultipartForm(pdfcore.MaxUpload); err != nil {
 		http.Error(w, "upload too large or malformed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -223,7 +225,7 @@ func handleDeletePages(w http.ResponseWriter, r *http.Request) {
 	}
 	pages := r.FormValue("pages")
 
-	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), pdfcore.RequestTimeout)
 	defer cancel()
 	result, err := DeletePages(ctx, pdf, pages)
 	if err != nil {
@@ -234,13 +236,13 @@ func handleDeletePages(w http.ResponseWriter, r *http.Request) {
 	writePDFResponse(w, "deleted.pdf", result)
 }
 
-func handleCompress(w http.ResponseWriter, r *http.Request) {
+func HandleCompress(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
-	if err := r.ParseMultipartForm(maxUpload); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, pdfcore.MaxUpload)
+	if err := r.ParseMultipartForm(pdfcore.MaxUpload); err != nil {
 		http.Error(w, "upload too large or malformed: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -258,7 +260,7 @@ func handleCompress(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), editTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), pdfcore.RequestTimeout)
 	defer cancel()
 	compressed, err := CompressPDF(ctx, pdf, quality)
 	if err != nil {

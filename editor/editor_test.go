@@ -1,83 +1,20 @@
 // Regression tests for the PDF text-editing engine. Fixtures are built
-// programmatically (rather than checked in as binary .pdf files) to keep
-// the repo dependency-free and diffs readable. Each test targets a real bug
-// found and fixed during development, so a future change that reintroduces
-// one of them fails loudly here instead of only showing up against a real
-// user document.
-package main
+// programmatically (via pdftestutil, rather than checked-in binary .pdf
+// files) to keep the repo dependency-free and diffs readable. Each test
+// targets a real bug found and fixed during development, so a future
+// change that reintroduces one of them fails loudly here instead of only
+// showing up against a real user document.
+package editor
 
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os/exec"
 	"strings"
 	"testing"
+
+	"pdfer/pdfcore"
+	"pdfer/pdftestutil"
 )
-
-func requireQpdf(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("qpdf"); err != nil {
-		t.Skip("qpdf not installed - skipping (it's a hard runtime dependency of the app, install it to run this test)")
-	}
-}
-
-// testObj is one object in a hand-built fixture PDF. Dict must be a
-// complete "<< ... >>" dictionary; for a stream object it must NOT include
-// /Length - buildTestPDF injects that automatically from len(Stream).
-type testObj struct {
-	Dict   string
-	Stream []byte
-}
-
-// buildTestPDF assembles a minimal classic (non-encrypted, non-linearized)
-// PDF from a list of objects, numbered 1..len(objs) in order, with a
-// trailer pointing /Root at rootObjNum.
-func buildTestPDF(objs []testObj, rootObjNum int) []byte {
-	var buf strings.Builder
-	buf.WriteString("%PDF-1.4\n")
-	offsets := make([]int, len(objs)+1)
-	for i, o := range objs {
-		num := i + 1
-		offsets[num] = buf.Len()
-		dict := o.Dict
-		if o.Stream != nil {
-			dict = strings.TrimSuffix(strings.TrimSpace(dict), ">>")
-			dict = dict + fmt.Sprintf(" /Length %d >>", len(o.Stream))
-		}
-		fmt.Fprintf(&buf, "%d 0 obj\n%s", num, dict)
-		if o.Stream != nil {
-			buf.WriteString("\nstream\n")
-			buf.Write(o.Stream)
-			buf.WriteString("\nendstream")
-		}
-		buf.WriteString("\nendobj\n")
-	}
-	xrefPos := buf.Len()
-	fmt.Fprintf(&buf, "xref\n0 %d\n", len(objs)+1)
-	buf.WriteString("0000000000 65535 f \n")
-	for n := 1; n <= len(objs); n++ {
-		fmt.Fprintf(&buf, "%010d 00000 n \n", offsets[n])
-	}
-	fmt.Fprintf(&buf, "trailer\n<< /Size %d /Root %d 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, rootObjNum, xrefPos)
-	return []byte(buf.String())
-}
-
-// simplePagePDF builds a one-page PDF using plain Helvetica (a standard
-// base-14 font with no embedded /Widths, so it's always width-safe) with
-// the given content stream, plus any extra objects (fonts, XObjects, etc.)
-// the caller wants appended after the standard 5 objects.
-func simplePagePDF(content string, extra ...testObj) []byte {
-	objs := []testObj{
-		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
-		{Dict: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"},
-		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
-		{Dict: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"},
-		{Stream: []byte(content), Dict: "<<>>"},
-	}
-	objs = append(objs, extra...)
-	return buildTestPDF(objs, 1)
-}
 
 func mustEditPDF(t *testing.T, pdf []byte, find, repl, lang string, page, occurrence int) (out []byte, count int) {
 	t.Helper()
@@ -86,7 +23,7 @@ func mustEditPDF(t *testing.T, pdf []byte, find, repl, lang string, page, occurr
 
 func mustEditPDFRegex(t *testing.T, pdf []byte, find, repl, lang string, page, occurrence int, useRegex bool) (out []byte, count int) {
 	t.Helper()
-	requireQpdf(t)
+	pdftestutil.RequireQpdf(t)
 	out, count, err := EditPDF(context.Background(), pdf, find, repl, lang, page, occurrence, useRegex)
 	if err != nil {
 		t.Fatalf("EditPDF(%q -> %q): %v", find, repl, err)
@@ -94,32 +31,35 @@ func mustEditPDFRegex(t *testing.T, pdf []byte, find, repl, lang string, page, o
 	return out, count
 }
 
+// extractText decodes every page's text the same way EditPDF itself
+// does (via pdfcore's shared font/tokenizer machinery), for asserting on
+// the actual post-edit content.
 func extractText(t *testing.T, pdf []byte) string {
 	t.Helper()
-	objects, err := parseObjects(mustNormalize(t, pdf))
+	objects, err := pdfcore.ParseObjects(mustNormalize(t, pdf))
 	if err != nil {
-		t.Fatalf("parseObjects: %v", err)
+		t.Fatalf("ParseObjects: %v", err)
 	}
 	objByNum := make(map[int]int, len(objects))
 	for idx, o := range objects {
-		objByNum[o.num] = idx
+		objByNum[o.Num] = idx
 	}
 	var out strings.Builder
 	for pageIdx := range objects {
-		if !isPageObject(objects[pageIdx].body) {
+		if !pdfcore.IsPageObject(objects[pageIdx].Body) {
 			continue
 		}
-		var rootScope resScope
-		if resOwner, rStart, rEnd, ok := resolvePageResources(objects, objByNum, pageIdx); ok {
-			rootScope = resolveScope(objects, objByNum, map[int]*resolvedFont{}, "turkish", resOwner, rStart, rEnd)
+		var rootScope pdfcore.ResScope
+		if resOwner, rStart, rEnd, ok := pdfcore.ResolvePageResources(objects, objByNum, pageIdx); ok {
+			rootScope = pdfcore.ResolveScope(objects, objByNum, map[int]*pdfcore.ResolvedFont{}, "turkish", resOwner, rStart, rEnd)
 		}
-		var units []formContentUnit
+		var units []pdfcore.FormContentUnit
 		visiting := map[int]bool{}
-		for _, cIdx := range resolvePageContents(objects, objByNum, pageIdx) {
-			walkContent(objects, objByNum, map[int]*resolvedFont{}, "turkish", cIdx, rootScope, 0, visiting, &units)
+		for _, cIdx := range pdfcore.ResolvePageContents(objects, objByNum, pageIdx) {
+			pdfcore.WalkContent(objects, objByNum, map[int]*pdfcore.ResolvedFont{}, "turkish", cIdx, rootScope, 0, visiting, &units)
 		}
 		for _, u := range units {
-			dr := decodeContentStream(tokenizeContentStream(objects[u.streamIdx].stream), u.scope.fontMap)
+			dr := decodeContentStream(pdfcore.TokenizeContentStream(objects[u.StreamIdx].Stream), u.Scope.FontMap)
 			out.WriteString(string(dr.runes))
 		}
 	}
@@ -128,7 +68,7 @@ func extractText(t *testing.T, pdf []byte) string {
 
 func mustNormalize(t *testing.T, pdf []byte) []byte {
 	t.Helper()
-	norm, err := normalize(context.Background(), pdf)
+	norm, err := pdfcore.Normalize(context.Background(), pdf)
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
@@ -138,7 +78,7 @@ func mustNormalize(t *testing.T, pdf []byte) []byte {
 // --- Basic replace-all and occurrence targeting -----------------------
 
 func TestReplaceAll(t *testing.T) {
-	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td (ACME first line) Tj ET\n" +
+	pdf := pdftestutil.SimplePagePDF("BT /F1 24 Tf 50 700 Td (ACME first line) Tj ET\n" +
 		"BT /F1 24 Tf 50 650 Td (ACME second line) Tj ET\n" +
 		"BT /F1 24 Tf 50 600 Td (ACME third line) Tj ET\n")
 
@@ -156,7 +96,7 @@ func TestReplaceAll(t *testing.T) {
 }
 
 func TestOccurrenceTargeting(t *testing.T) {
-	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td (ACME first line) Tj ET\n" +
+	pdf := pdftestutil.SimplePagePDF("BT /F1 24 Tf 50 700 Td (ACME first line) Tj ET\n" +
 		"BT /F1 24 Tf 50 650 Td (ACME second line) Tj ET\n" +
 		"BT /F1 24 Tf 50 600 Td (ACME third line) Tj ET\n")
 
@@ -177,7 +117,7 @@ func TestOccurrenceTargeting(t *testing.T) {
 // --- Regex find/replace -------------------------------------------------
 
 func TestRegexReplaceWithCaptureGroups(t *testing.T) {
-	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td (Invoice 2024-001) Tj ET\n" +
+	pdf := pdftestutil.SimplePagePDF("BT /F1 24 Tf 50 700 Td (Invoice 2024-001) Tj ET\n" +
 		"BT /F1 24 Tf 50 650 Td (Invoice 2024-002) Tj ET\n")
 
 	out, count := mustEditPDFRegex(t, pdf, `Invoice (\d+)-(\d+)`, "INV-$2/$1", "latin", 0, -1, true)
@@ -191,15 +131,15 @@ func TestRegexReplaceWithCaptureGroups(t *testing.T) {
 }
 
 func TestInvalidRegexReturnsBadInput(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td (Hello World) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 24 Tf 50 700 Td (Hello World) Tj ET\n")
 	_, _, err := EditPDF(context.Background(), pdf, "(unclosed", "x", "latin", 0, -1, true)
 	if err == nil {
 		t.Fatal("expected an error for an invalid regex, got nil")
 	}
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if !errors.As(err, &bad) {
-		t.Fatalf("expected a badInputError, got %T: %v", err, err)
+		t.Fatalf("expected a BadInputError, got %T: %v", err, err)
 	}
 }
 
@@ -210,20 +150,20 @@ func TestKerningPreservedInSameFontReplace(t *testing.T) {
 	// A TJ array with kerning numbers around a colon, mimicking a
 	// "Label: value" field - the pattern that used to lose its kerning
 	// numbers (and, before that, corrupt the array's syntax entirely).
-	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td [(Hello) -30 (World:) 20 (Test)] TJ ET\n")
+	pdf := pdftestutil.SimplePagePDF("BT /F1 24 Tf 50 700 Td [(Hello) -30 (World:) 20 (Test)] TJ ET\n")
 
 	out, count := mustEditPDF(t, pdf, "World", "Earth", "latin", 0, -1)
 	if count != 1 {
 		t.Fatalf("want 1 replacement, got %d", count)
 	}
-	objects, err := parseObjects(mustNormalize(t, out))
+	objects, err := pdfcore.ParseObjects(mustNormalize(t, out))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var streamStr string
 	for _, o := range objects {
-		if o.hasStream && strings.Contains(string(o.stream), "TJ") {
-			streamStr = string(o.stream)
+		if o.HasStream && strings.Contains(string(o.Stream), "TJ") {
+			streamStr = string(o.Stream)
 		}
 	}
 	if !strings.Contains(streamStr, "-30") || !strings.Contains(streamStr, "20") {
@@ -242,19 +182,19 @@ func TestNoDuplicateOperatorOnSimpleReplace(t *testing.T) {
 	// Regression: a same-font replacement of a plain "(x) Tj" call used to
 	// leave the original operator behind, producing a bare, operand-less
 	// "Tj" right after the new one - invalid content-stream syntax.
-	pdf := simplePagePDF("BT /F1 24 Tf 50 700 Td (ACME) Tj ET\n")
+	pdf := pdftestutil.SimplePagePDF("BT /F1 24 Tf 50 700 Td (ACME) Tj ET\n")
 	out, count := mustEditPDF(t, pdf, "ACME", "GLOBEX", "latin", 0, -1)
 	if count != 1 {
 		t.Fatalf("want 1 replacement, got %d", count)
 	}
-	objects, err := parseObjects(mustNormalize(t, out))
+	objects, err := pdfcore.ParseObjects(mustNormalize(t, out))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var streamStr string
 	for _, o := range objects {
-		if o.hasStream && strings.Contains(string(o.stream), "GLOBEX") {
-			streamStr = string(o.stream)
+		if o.HasStream && strings.Contains(string(o.Stream), "GLOBEX") {
+			streamStr = string(o.Stream)
 		}
 	}
 	if strings.Count(streamStr, "Tj") != 1 {
@@ -270,12 +210,12 @@ func TestZeroWidthFontReroutesToFallback(t *testing.T) {
 	// widths for characters the original document didn't use. Replacing
 	// with text that needs one of those zero-width bytes must reroute to
 	// the fallback font instead of silently overlapping glyphs.
-	sparseFont := testObj{Dict: "<< /Type /Font /Subtype /TrueType /BaseFont /Sparse " +
+	sparseFont := pdftestutil.TestObj{Dict: "<< /Type /Font /Subtype /TrueType /BaseFont /Sparse " +
 		"/FirstChar 65 /LastChar 67 /Widths [ 700 0 0 ] /FontDescriptor 6 0 R >>"}
-	descriptor := testObj{Dict: "<< /Type /FontDescriptor /FontName /Sparse /Flags 32 " +
+	descriptor := pdftestutil.TestObj{Dict: "<< /Type /FontDescriptor /FontName /Sparse /Flags 32 " +
 		"/FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 700 /Descent -200 /CapHeight 700 /StemV 80 >>"}
 
-	pdf := simplePagePDF("BT /F2 10 Tf 50 700 Td (A) Tj ET\n",
+	pdf := pdftestutil.SimplePagePDF("BT /F2 10 Tf 50 700 Td (A) Tj ET\n",
 		sparseFont, descriptor)
 	// Point the page at font F2 = obj 6 (sparseFont) instead of F1.
 	pdf = []byte(strings.Replace(string(pdf), "/F1 4 0 R", "/F1 4 0 R /F2 6 0 R", 1))
@@ -284,17 +224,17 @@ func TestZeroWidthFontReroutesToFallback(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("want 1 replacement, got %d", count)
 	}
-	objects, err := parseObjects(mustNormalize(t, out))
+	objects, err := pdfcore.ParseObjects(mustNormalize(t, out))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var streamStr string
 	for _, o := range objects {
-		if o.hasStream && strings.Contains(string(o.stream), "AB") {
-			streamStr = string(o.stream)
+		if o.HasStream && strings.Contains(string(o.Stream), "AB") {
+			streamStr = string(o.Stream)
 		}
 	}
-	if !strings.Contains(streamStr, fallbackFontResourceName) {
+	if !strings.Contains(streamStr, pdfcore.FallbackFontResourceName) {
 		t.Errorf("expected reroute to the fallback font (byte 66/'B' has width 0 in the sparse font), stream: %q", streamStr)
 	}
 }
@@ -308,13 +248,13 @@ func TestFontStateRestoredAcrossQQ(t *testing.T) {
 	// its own (relying on the font from before some earlier q/Q block) to
 	// be decoded through the wrong, leftover font.
 	//
-	// F2 here is a fake CID font (no real embedded font data - our decoder
-	// never touches FontFile2, only /ToUnicode) so that misinterpreting
-	// "(AB)" through it (as one 2-byte CID code) is easy to detect: it
-	// wouldn't decode to "AB" at all.
-	cidFont := testObj{Dict: "<< /Type /Font /Subtype /Type0 /BaseFont /Fake " +
+	// F2 here is a fake CID font (no real embedded font data - the
+	// decoder never touches FontFile2, only /ToUnicode) so that
+	// misinterpreting "(AB)" through it (as one 2-byte CID code) is easy
+	// to detect: it wouldn't decode to "AB" at all.
+	cidFont := pdftestutil.TestObj{Dict: "<< /Type /Font /Subtype /Type0 /BaseFont /Fake " +
 		"/Encoding /Identity-H /ToUnicode 7 0 R >>"}
-	toUnicode := testObj{Stream: []byte(
+	toUnicode := pdftestutil.TestObj{Stream: []byte(
 		"/CIDInit /ProcSet findresource begin\n" +
 			"1 begincodespacerange <0000> <FFFF> endcodespacerange\n" +
 			"1 beginbfchar <0001> <005A> endbfchar\n" + // CID 1 -> 'Z'
@@ -324,7 +264,7 @@ func TestFontStateRestoredAcrossQQ(t *testing.T) {
 		"q BT /F2 10 Tf 1 0 0 1 0 650 Td <0001> Tj ET Q " +
 		"BT 1 0 0 1 0 600 Td (AB) Tj ET"
 
-	pdf := simplePagePDF(content, cidFont, toUnicode)
+	pdf := pdftestutil.SimplePagePDF(content, cidFont, toUnicode)
 	pdf = []byte(strings.Replace(string(pdf), "/F1 4 0 R", "/F1 4 0 R /F2 6 0 R", 1))
 
 	text := extractText(t, pdf)
@@ -350,13 +290,13 @@ func TestFormXObjectContentIsSearched(t *testing.T) {
 	// Regression: some generators (iText and others) put all of a page's
 	// real content inside a Form XObject invoked via "Do", leaving the
 	// page's own /Contents almost empty and with no /Font resources at
-	// all. pdfer must walk into the Form to find any text.
-	form := testObj{Dict: "<< /Type /XObject /Subtype /Form /FormType 1 " +
+	// all. The editor must walk into the Form to find any text.
+	form := pdftestutil.TestObj{Dict: "<< /Type /XObject /Subtype /Form /FormType 1 " +
 		"/BBox [0 0 612 792] /Matrix [1 0 0 1 0 0] " +
 		"/Resources << /Font << /F1 4 0 R >> >> >>",
 		Stream: []byte("BT /F1 24 Tf 50 700 Td (ACME inside form) Tj ET\n")}
 
-	objs := []testObj{
+	objs := []pdftestutil.TestObj{
 		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
 		{Dict: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>"},
 		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] " +
@@ -365,7 +305,7 @@ func TestFormXObjectContentIsSearched(t *testing.T) {
 		{Stream: []byte("q 1 0 0 1 0 0 cm /Xf1 Do Q\n"), Dict: "<<>>"},
 		form,
 	}
-	pdf := buildTestPDF(objs, 1)
+	pdf := pdftestutil.BuildTestPDF(objs, 1)
 
 	out, count := mustEditPDF(t, pdf, "ACME", "GLOBEX", "latin", 0, -1)
 	if count != 1 {
@@ -374,37 +314,5 @@ func TestFormXObjectContentIsSearched(t *testing.T) {
 	text := extractText(t, out)
 	if !strings.Contains(text, "GLOBEX inside form") {
 		t.Errorf("want replaced text inside the form, got %q", text)
-	}
-}
-
-// --- Turkish/Latin encoding table sanity --------------------------------
-
-func TestEncodingTableIsBijective(t *testing.T) {
-	// Regression: buildTable used to be able to produce a rune -> byte
-	// table where inverting it for decoding was ambiguous/nondeterministic
-	// (two runes mapping to the same byte), causing a subset of
-	// characters to decode incorrectly at random depending on Go's map
-	// iteration order.
-	for lang, enc := range encodingTables {
-		dec := decodingTables[lang]
-		for r, b := range enc {
-			if got := dec[b]; got != r {
-				t.Errorf("%s: byte %#x round-trips to %q, want %q", lang, b, got, r)
-			}
-		}
-	}
-}
-
-func TestTurkishSpecialCharsRoundTrip(t *testing.T) {
-	table := encodingTables["turkish"]
-	for _, r := range []rune{'ş', 'Ş', 'ğ', 'Ğ', 'ı', 'İ'} {
-		b, ok := table[r]
-		if !ok {
-			t.Errorf("turkish table missing %q", r)
-			continue
-		}
-		if decodingTables["turkish"][b] != r {
-			t.Errorf("turkish table: %q -> byte %#x does not decode back to %q", r, b, r)
-		}
 	}
 }

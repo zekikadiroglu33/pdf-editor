@@ -1,4 +1,4 @@
-// Character-encoding support for non-ASCII find/replace text.
+// Character-encoding support for non-ASCII find/replace/watermark text.
 //
 // PDF content streams store text as raw bytes in whatever single-byte
 // encoding the font's /Encoding uses - almost always WinAnsiEncoding, which
@@ -9,11 +9,11 @@
 // instead. Windows-1254 ("Turkish") is cp1252 with just those six slots
 // swapped, so that's the table this file builds for the "turkish" language.
 //
-// Since the uploaded PDF is never decoded to Unicode (see main.go), the
-// only way to byte-match the user's UTF-8 find/replace text against the
-// stream is to transcode it into the same single-byte encoding first. The
-// "language" selected in the UI picks which table to transcode with.
-package main
+// Since the uploaded PDF is never decoded to Unicode ahead of time, the
+// only way to byte-match UTF-8 text against the stream is to transcode
+// it into the same single-byte encoding first. The "language" selected
+// in the UI picks which table to transcode with.
+package pdfcore
 
 // cp1252SpecialUpper holds the Windows-1252 code points in 0x80-0x9F that
 // are not identical to Latin-1 (curly quotes, dashes, etc.).
@@ -36,10 +36,10 @@ var turkishOverrides = map[byte]rune{
 
 // turkishSpecialRunes are the six Turkish letters with no representation in
 // standard WinAnsiEncoding at all. A PDF's original font almost always
-// declares plain /WinAnsiEncoding (pdfer doesn't parse /Differences), so
+// declares plain /WinAnsiEncoding (this app doesn't parse /Differences), so
 // reusing it to encode one of these runes would silently render the wrong
-// (Icelandic) glyph. Text needing any of these must go through pdfer's
-// bundled fallback font instead (see pdftext.go's reroute decision).
+// (Icelandic) glyph. Text needing any of these must go through the bundled
+// fallback font instead (see editor's reroute decision).
 var turkishSpecialRunes = map[rune]bool{}
 
 func init() {
@@ -48,7 +48,7 @@ func init() {
 	}
 }
 
-func needsTurkishSpecial(runes []rune) bool {
+func NeedsTurkishSpecial(runes []rune) bool {
 	for _, r := range runes {
 		if turkishSpecialRunes[r] {
 			return true
@@ -89,30 +89,30 @@ func buildTable(overrides map[byte]rune) map[rune]byte {
 	return table
 }
 
-// encodingTables maps a UI language code to its rune -> byte table.
-var encodingTables = map[string]map[rune]byte{
+// EncodingTables maps a UI language code to its rune -> byte table.
+var EncodingTables = map[string]map[rune]byte{
 	"latin":   buildTable(nil),
 	"turkish": buildTable(turkishOverrides),
 }
 
-// decodingTables are the byte -> rune inverses of encodingTables, used to
+// DecodingTables are the byte -> rune inverses of EncodingTables, used to
 // decode existing simple-font PDF content-stream bytes back into Unicode
-// for matching (see pdftext.go).
-var decodingTables = map[string]map[byte]rune{}
+// for matching.
+var DecodingTables = map[string]map[byte]rune{}
 
 func init() {
-	for lang, enc := range encodingTables {
+	for lang, enc := range EncodingTables {
 		dec := make(map[byte]rune, len(enc))
 		for r, b := range enc {
 			dec[b] = r
 		}
-		decodingTables[lang] = dec
+		DecodingTables[lang] = dec
 	}
 }
 
-// encodeRaw transcodes s into the given single-byte table, unescaped. ok is
+// EncodeRaw transcodes s into the given single-byte table, unescaped. ok is
 // false if s contains a character the table cannot represent.
-func encodeRaw(s string, table map[rune]byte) (out []byte, ok bool) {
+func EncodeRaw(s string, table map[rune]byte) (out []byte, ok bool) {
 	for _, r := range s {
 		b, found := table[r]
 		if !found {
@@ -123,11 +123,11 @@ func encodeRaw(s string, table map[rune]byte) (out []byte, ok bool) {
 	return out, true
 }
 
-// encodeAndEscape transcodes s into the given single-byte table and escapes
+// EncodeAndEscape transcodes s into the given single-byte table and escapes
 // it for use inside a PDF literal string ( ... ). ok is false if s contains
 // a character the table cannot represent.
-func encodeAndEscape(s string, table map[rune]byte) (out []byte, ok bool) {
-	raw, ok := encodeRaw(s, table)
+func EncodeAndEscape(s string, table map[rune]byte) (out []byte, ok bool) {
+	raw, ok := EncodeRaw(s, table)
 	if !ok {
 		return nil, false
 	}

@@ -6,7 +6,7 @@
 // model as the other formats, just laid out as rows instead of prose.
 // Cells use inline strings (t="inlineStr") so no shared-strings table is
 // needed.
-package main
+package conversion
 
 import (
 	"archive/zip"

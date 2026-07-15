@@ -4,7 +4,11 @@ WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
 COPY static ./static
-COPY assets ./assets
+COPY pdfcore ./pdfcore
+COPY pdftestutil ./pdftestutil
+COPY editor ./editor
+COPY conversion ./conversion
+COPY pdfTools ./pdfTools
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /pdfer .
 
 # --- runtime stage -------------------------------------------------------

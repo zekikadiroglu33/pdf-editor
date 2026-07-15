@@ -1,30 +1,32 @@
-// convert.go - best-effort PDF -> other-format conversion, shared pipeline.
+// Package conversion is the best-effort PDF -> other-format conversion
+// pipeline.
 //
 // PDF has no paragraph model: a content stream only positions individual
 // glyphs/strings on a page via Tf (font/size), Td/TD/Tm (move to a new
 // text line), TL (line spacing) and T*/'/" (advance a line then show
-// text). This reuses the same font-resolution machinery as pdftext.go
-// (simple-font byte tables and CID /ToUnicode maps) to decode each
-// page's actual Unicode text, but additionally tracks that positioning
-// state to recover each line's vertical position, then groups
-// consecutive lines into paragraphs the same way pdftotext/PyMuPDF-style
-// tools do: a normal line-wrap gap continues the current paragraph, a
-// larger gap (or a change of font size) starts a new one. Columns,
-// tables and images are not reconstructed - see README limitations.
+// text). This reuses pdfcore's font-resolution machinery (simple-font
+// byte tables and CID /ToUnicode maps) to decode each page's actual
+// Unicode text, but additionally tracks that positioning state to
+// recover each line's vertical position, then groups consecutive lines
+// into paragraphs the same way pdftotext/PyMuPDF-style tools do: a
+// normal line-wrap gap continues the current paragraph, a larger gap (or
+// a change of font size) starts a new one. Columns, tables and images
+// are not reconstructed - see README limitations.
 //
-// The extraction above (this file) is shared by every output format; each
-// format's own file (convert_docx.go, convert_txt.go, convert_html.go,
-// convert_svg.go, convert_xlsx.go, convert_pptx.go) only turns the
-// resulting per-page paragraph lists into its own file bytes.
-package main
+// The extraction above (this file) is shared by every output format;
+// each format's own file (convert_docx.go, convert_txt.go,
+// convert_html.go, convert_svg.go, convert_xlsx.go, convert_pptx.go)
+// only turns the resulting per-page paragraph lists into its own file
+// bytes.
+package conversion
 
 import (
 	"context"
 	"fmt"
-	"math"
-	"regexp"
 	"strconv"
 	"strings"
+
+	"pdfer/pdfcore"
 )
 
 // ---------------------------------------------------------------------------
@@ -41,11 +43,11 @@ type extractedLine struct {
 
 // extractPageLines decodes every text-bearing content-stream unit
 // belonging to one page (its own /Contents, plus any Form XObjects it
-// invokes - see walkContent in pdftext.go) into an ordered slice of lines.
-func extractPageLines(objects []pdfObject, units []formContentUnit) []extractedLine {
+// invokes - see pdfcore.WalkContent) into an ordered slice of lines.
+func extractPageLines(objects []pdfcore.PdfObject, units []pdfcore.FormContentUnit) []extractedLine {
 	var lines []extractedLine
 	for _, u := range units {
-		lines = append(lines, extractLinesFromTokens(tokenizeContentStream(objects[u.streamIdx].stream), u.scope.fontMap)...)
+		lines = append(lines, extractLinesFromTokens(pdfcore.TokenizeContentStream(objects[u.StreamIdx].Stream), u.Scope.FontMap)...)
 	}
 	return lines
 }
@@ -56,9 +58,9 @@ func extractPageLines(objects []pdfObject, units []formContentUnit) []extractedL
 // position, without needing full text/CTM matrix math: real-world PDFs
 // essentially never rotate or skew text, so the Y translation component
 // alone is a reliable proxy for "how far down the page".
-func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []extractedLine {
+func extractLinesFromTokens(toks []pdfcore.CsToken, fontMap map[string]*pdfcore.ResolvedFont) []extractedLine {
 	var lines []extractedLine
-	var curResolved *resolvedFont
+	var curResolved *pdfcore.ResolvedFont
 	var curSize float64
 	var lastName string
 	var nums []float64
@@ -70,7 +72,7 @@ func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []
 	// here (see the "BT" case below).
 	type gstate struct {
 		size, leading float64
-		resolved      *resolvedFont
+		resolved      *pdfcore.ResolvedFont
 	}
 	var gsStack []gstate
 
@@ -79,16 +81,16 @@ func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []
 			return ""
 		}
 		var rs []rune
-		if curResolved.isCID {
+		if curResolved.IsCID {
 			for k := 0; k+1 < len(b); k += 2 {
 				code := uint32(b[k])<<8 | uint32(b[k+1])
-				if r, ok := curResolved.cidToRune[code]; ok {
+				if r, ok := curResolved.CidToRune[code]; ok {
 					rs = append(rs, r)
 				}
 			}
 		} else {
 			for _, bb := range b {
-				if r, ok := curResolved.simpleDecode[bb]; ok {
+				if r, ok := curResolved.SimpleDecode[bb]; ok {
 					rs = append(rs, r)
 				}
 			}
@@ -106,12 +108,12 @@ func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []
 	i := 0
 	for i < len(toks) {
 		t := toks[i]
-		switch t.kind {
+		switch t.Kind {
 		case 'N':
-			lastName = t.s
+			lastName = t.S
 			nums = nums[:0]
 		case 'n':
-			if v, err := strconv.ParseFloat(t.s, 64); err == nil {
+			if v, err := strconv.ParseFloat(t.S, 64); err == nil {
 				nums = append(nums, v)
 			}
 		case '[':
@@ -119,7 +121,7 @@ func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []
 			j := i + 1
 			var parts []string
 			for j < len(toks) && depth > 0 {
-				switch toks[j].kind {
+				switch toks[j].Kind {
 				case '[':
 					depth++
 				case ']':
@@ -128,12 +130,12 @@ func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []
 						goto arrDone
 					}
 				case 'S':
-					parts = append(parts, decodeStr(toks[j].b))
+					parts = append(parts, decodeStr(toks[j].B))
 				}
 				j++
 			}
 		arrDone:
-			if j+1 < len(toks) && toks[j+1].kind == 'O' && toks[j+1].s == "TJ" {
+			if j+1 < len(toks) && toks[j+1].Kind == 'O' && toks[j+1].S == "TJ" {
 				flush(strings.Join(parts, ""))
 				i = j + 1
 			} else {
@@ -141,7 +143,7 @@ func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []
 			}
 			nums = nums[:0]
 		case 'O':
-			switch t.s {
+			switch t.S {
 			case "BT":
 				// BT always resets the text line matrix to identity,
 				// regardless of whatever q/Q or prior text objects did.
@@ -179,18 +181,18 @@ func extractLinesFromTokens(toks []csToken, fontMap map[string]*resolvedFont) []
 			case "T*":
 				y -= leading
 			case "Tj":
-				if i > 0 && toks[i-1].kind == 'S' {
-					flush(decodeStr(toks[i-1].b))
+				if i > 0 && toks[i-1].Kind == 'S' {
+					flush(decodeStr(toks[i-1].B))
 				}
 			case "'":
 				y -= leading
-				if i > 0 && toks[i-1].kind == 'S' {
-					flush(decodeStr(toks[i-1].b))
+				if i > 0 && toks[i-1].Kind == 'S' {
+					flush(decodeStr(toks[i-1].B))
 				}
 			case "\"":
 				y -= leading
-				if i > 0 && toks[i-1].kind == 'S' {
-					flush(decodeStr(toks[i-1].b))
+				if i > 0 && toks[i-1].Kind == 'S' {
+					flush(decodeStr(toks[i-1].B))
 				}
 			}
 			nums = nums[:0]
@@ -251,81 +253,6 @@ func groupParagraphs(lines []extractedLine) []string {
 }
 
 // ---------------------------------------------------------------------------
-// Page size (/MediaBox, with inheritance) - only used by formats that need
-// an actual page canvas (currently svg); text-flow formats ignore it.
-// ---------------------------------------------------------------------------
-
-var mediaBoxKeyRe = regexp.MustCompile(`/MediaBox\s*\[([^\]]*)\]`)
-
-const defaultPageWidth, defaultPageHeight = 612.0, 792.0 // US Letter, points
-
-// resolvePageMediaBox finds the /MediaBox that applies to a page (walking
-// /Parent for an inherited one, same pattern as resolvePageResources),
-// falling back to US Letter if none is found or it doesn't parse cleanly.
-func resolvePageMediaBox(objects []pdfObject, objByNum map[int]int, pageIdx int) (width, height float64) {
-	curIdx := pageIdx
-	for hops := 0; hops < 16; hops++ {
-		if m := mediaBoxKeyRe.FindSubmatch(objects[curIdx].body); m != nil {
-			fields := strings.Fields(string(m[1]))
-			if len(fields) == 4 {
-				var nums [4]float64
-				ok := true
-				for i, f := range fields {
-					v, err := strconv.ParseFloat(f, 64)
-					if err != nil {
-						ok = false
-						break
-					}
-					nums[i] = v
-				}
-				if ok {
-					w, h := math.Abs(nums[2]-nums[0]), math.Abs(nums[3]-nums[1])
-					if w > 0 && h > 0 {
-						return w, h
-					}
-				}
-			}
-		}
-		pOwner, _, _, pOk := findDictValue(objects, objByNum, curIdx, 0, len(objects[curIdx].body), parentKeyRe)
-		if !pOk {
-			break
-		}
-		curIdx = pOwner
-	}
-	return defaultPageWidth, defaultPageHeight
-}
-
-// wrapText greedily wraps s into lines of at most maxChars characters,
-// breaking only at word boundaries. Used by output formats with no native
-// text reflow of their own (svg; pptx boxes do reflow themselves, but a
-// pre-wrap keeps very long paragraphs from visually overrunning the box).
-func wrapText(s string, maxChars int) []string {
-	if maxChars <= 0 {
-		return []string{s}
-	}
-	words := strings.Fields(s)
-	if len(words) == 0 {
-		return nil
-	}
-	var lines []string
-	var cur strings.Builder
-	for _, w := range words {
-		if cur.Len() > 0 && cur.Len()+1+len(w) > maxChars {
-			lines = append(lines, cur.String())
-			cur.Reset()
-		}
-		if cur.Len() > 0 {
-			cur.WriteByte(' ')
-		}
-		cur.WriteString(w)
-	}
-	if cur.Len() > 0 {
-		lines = append(lines, cur.String())
-	}
-	return lines
-}
-
-// ---------------------------------------------------------------------------
 // Shared XML escaping (reused by the OOXML and markup output formats)
 // ---------------------------------------------------------------------------
 
@@ -349,7 +276,8 @@ const oouxmlCoreProps = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 // ---------------------------------------------------------------------------
 
 // pdfPage is one PDF page's extracted content: its paragraphs (see
-// groupParagraphs) and its page size in points (see resolvePageMediaBox).
+// groupParagraphs) and its page size in points (see
+// pdfcore.ResolvePageMediaBox).
 type pdfPage struct {
 	paragraphs    []string
 	width, height float64
@@ -357,31 +285,31 @@ type pdfPage struct {
 
 // extractPDFPages is the shared first half of every conversion: normalize
 // with qpdf (so content streams are plain, uncompressed bytes, same as
-// EditPDF), walk the page tree, and decode each page's text into
+// editor.EditPDF), walk the page tree, and decode each page's text into
 // paragraphs. Every output format builds its file from this same slice.
 func extractPDFPages(ctx context.Context, pdf []byte, lang string) ([]pdfPage, error) {
-	if _, ok := decodingTables[lang]; !ok {
-		return nil, &badInputError{fmt.Sprintf("unsupported language %q", lang)}
+	if _, ok := pdfcore.DecodingTables[lang]; !ok {
+		return nil, &pdfcore.BadInputError{Msg: fmt.Sprintf("unsupported language %q", lang)}
 	}
 
-	norm, err := normalize(ctx, pdf)
+	norm, err := pdfcore.Normalize(ctx, pdf)
 	if err != nil {
 		return nil, fmt.Errorf("normalize: %w", err)
 	}
-	objects, err := parseObjects(norm)
+	objects, err := pdfcore.ParseObjects(norm)
 	if err != nil {
 		return nil, fmt.Errorf("parse: %w", err)
 	}
 
 	objByNum := make(map[int]int, len(objects))
 	for idx, o := range objects {
-		objByNum[o.num] = idx
+		objByNum[o.Num] = idx
 	}
 
-	pageOrder := resolvePageOrder(objects, objByNum)
+	pageOrder := pdfcore.ResolvePageOrder(objects, objByNum)
 	if len(pageOrder) == 0 {
 		for idx, o := range objects {
-			if isPageObject(o.body) {
+			if pdfcore.IsPageObject(o.Body) {
 				pageOrder = append(pageOrder, idx)
 			}
 		}
@@ -390,23 +318,23 @@ func extractPDFPages(ctx context.Context, pdf []byte, lang string) ([]pdfPage, e
 		return nil, fmt.Errorf("no pages found")
 	}
 
-	fontCache := map[int]*resolvedFont{}
+	fontCache := map[int]*pdfcore.ResolvedFont{}
 	pages := make([]pdfPage, len(pageOrder))
 
 	for pn, pageIdx := range pageOrder {
-		var rootScope resScope
-		if resOwner, rStart, rEnd, rOk := resolvePageResources(objects, objByNum, pageIdx); rOk {
-			rootScope = resolveScope(objects, objByNum, fontCache, lang, resOwner, rStart, rEnd)
+		var rootScope pdfcore.ResScope
+		if resOwner, rStart, rEnd, rOk := pdfcore.ResolvePageResources(objects, objByNum, pageIdx); rOk {
+			rootScope = pdfcore.ResolveScope(objects, objByNum, fontCache, lang, resOwner, rStart, rEnd)
 		}
 
-		var units []formContentUnit
+		var units []pdfcore.FormContentUnit
 		visiting := map[int]bool{}
-		for _, cIdx := range resolvePageContents(objects, objByNum, pageIdx) {
-			walkContent(objects, objByNum, fontCache, lang, cIdx, rootScope, 0, visiting, &units)
+		for _, cIdx := range pdfcore.ResolvePageContents(objects, objByNum, pageIdx) {
+			pdfcore.WalkContent(objects, objByNum, fontCache, lang, cIdx, rootScope, 0, visiting, &units)
 		}
 
 		lines := extractPageLines(objects, units)
-		w, h := resolvePageMediaBox(objects, objByNum, pageIdx)
+		w, h := pdfcore.ResolvePageMediaBox(objects, objByNum, pageIdx)
 		pages[pn] = pdfPage{paragraphs: groupParagraphs(lines), width: w, height: h}
 	}
 
@@ -453,7 +381,7 @@ func ConvertPDF(ctx context.Context, pdf []byte, lang, format string) (data []by
 
 	spec, ok := convertFormats[format]
 	if !ok {
-		return nil, 0, "", "", &badInputError{fmt.Sprintf("unsupported format %q", format)}
+		return nil, 0, "", "", &pdfcore.BadInputError{Msg: fmt.Sprintf("unsupported format %q", format)}
 	}
 
 	pages, err := extractPDFPages(ctx, pdf, lang)

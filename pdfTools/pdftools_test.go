@@ -1,5 +1,5 @@
 // Regression tests for the qpdf-backed page/document tools (pdftools.go).
-package main
+package pdftools
 
 import (
 	"archive/zip"
@@ -8,6 +8,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"pdfer/pdfcore"
+	"pdfer/pdftestutil"
 )
 
 // qdfText normalizes pdf with qpdf's own --qdf mode (uncompressed, one
@@ -15,29 +18,16 @@ import (
 // like "/Rotate 90" without worrying about object-stream compression.
 func qdfText(t *testing.T, pdf []byte) string {
 	t.Helper()
-	norm, err := normalize(context.Background(), pdf)
+	norm, err := pdfcore.Normalize(context.Background(), pdf)
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
 	return string(norm)
 }
 
-func twoPagePDF() []byte {
-	objs := []testObj{
-		{Dict: "<< /Type /Catalog /Pages 2 0 R >>"},
-		{Dict: "<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >>"},
-		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"},
-		{Dict: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"},
-		{Stream: []byte("BT /F1 12 Tf 72 700 Td (Page one text.) Tj ET\n"), Dict: "<<>>"},
-		{Dict: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>"},
-		{Stream: []byte("BT /F1 12 Tf 72 700 Td (Page two text.) Tj ET\n"), Dict: "<<>>"},
-	}
-	return buildTestPDF(objs, 1)
-}
-
 func TestRotatePDFAppliesAngle(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
 
 	out, err := RotatePDF(context.Background(), pdf, "", 90)
 	if err != nil {
@@ -49,20 +39,20 @@ func TestRotatePDFAppliesAngle(t *testing.T) {
 }
 
 func TestRotatePDFRejectsNonMultipleOf90(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
 
 	_, err := RotatePDF(context.Background(), pdf, "", 45)
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if !errors.As(err, &bad) {
-		t.Fatalf("expected a badInputError for a non-multiple-of-90 angle, got %T: %v", err, err)
+		t.Fatalf("expected a BadInputError for a non-multiple-of-90 angle, got %T: %v", err, err)
 	}
 }
 
 func TestMergePDFsConcatenatesPages(t *testing.T) {
-	requireQpdf(t)
-	a := simplePagePDF("BT /F1 12 Tf 72 700 Td (First document.) Tj ET\n")
-	b := simplePagePDF("BT /F1 12 Tf 72 700 Td (Second document.) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	a := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (First document.) Tj ET\n")
+	b := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Second document.) Tj ET\n")
 
 	out, err := MergePDFs(context.Background(), [][]byte{a, b})
 	if err != nil {
@@ -78,19 +68,19 @@ func TestMergePDFsConcatenatesPages(t *testing.T) {
 }
 
 func TestMergePDFsRejectsFewerThanTwo(t *testing.T) {
-	requireQpdf(t)
-	a := simplePagePDF("BT /F1 12 Tf 72 700 Td (Solo.) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	a := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Solo.) Tj ET\n")
 
 	_, err := MergePDFs(context.Background(), [][]byte{a})
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if !errors.As(err, &bad) {
-		t.Fatalf("expected a badInputError for a single-file merge, got %T: %v", err, err)
+		t.Fatalf("expected a BadInputError for a single-file merge, got %T: %v", err, err)
 	}
 }
 
 func TestSplitPDFDefaultsToOnePagePerFile(t *testing.T) {
-	requireQpdf(t)
-	pdf := twoPagePDF()
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.TwoPagePDF()
 
 	parts, err := SplitPDF(context.Background(), pdf, nil)
 	if err != nil {
@@ -111,8 +101,8 @@ func TestSplitPDFDefaultsToOnePagePerFile(t *testing.T) {
 }
 
 func TestSplitPDFExplicitRanges(t *testing.T) {
-	requireQpdf(t)
-	pdf := twoPagePDF()
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.TwoPagePDF()
 
 	parts, err := SplitPDF(context.Background(), pdf, []string{"1-2"})
 	if err != nil {
@@ -131,8 +121,8 @@ func TestSplitPDFExplicitRanges(t *testing.T) {
 }
 
 func TestDeletePagesRemovesOnlyRequestedPage(t *testing.T) {
-	requireQpdf(t)
-	pdf := twoPagePDF()
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.TwoPagePDF()
 
 	out, err := DeletePages(context.Background(), pdf, "1")
 	if err != nil {
@@ -146,7 +136,7 @@ func TestDeletePagesRemovesOnlyRequestedPage(t *testing.T) {
 		t.Fatalf("want 1 page remaining, got %d", n)
 	}
 
-	norm, err := normalize(context.Background(), out)
+	norm, err := pdfcore.Normalize(context.Background(), out)
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
@@ -159,19 +149,19 @@ func TestDeletePagesRemovesOnlyRequestedPage(t *testing.T) {
 }
 
 func TestDeletePagesRejectsEmptySelection(t *testing.T) {
-	requireQpdf(t)
-	pdf := twoPagePDF()
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.TwoPagePDF()
 
 	_, err := DeletePages(context.Background(), pdf, "")
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if !errors.As(err, &bad) {
-		t.Fatalf("expected a badInputError for an empty page selection, got %T: %v", err, err)
+		t.Fatalf("expected a BadInputError for an empty page selection, got %T: %v", err, err)
 	}
 }
 
 func TestCompressPDFProducesValidSmallerOrEqualPDF(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello, compress me.) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello, compress me.) Tj ET\n")
 
 	out, err := CompressPDF(context.Background(), pdf, 0)
 	if err != nil {
@@ -190,13 +180,13 @@ func TestCompressPDFProducesValidSmallerOrEqualPDF(t *testing.T) {
 }
 
 func TestCompressPDFRejectsBadQuality(t *testing.T) {
-	requireQpdf(t)
-	pdf := simplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
+	pdftestutil.RequireQpdf(t)
+	pdf := pdftestutil.SimplePagePDF("BT /F1 12 Tf 72 700 Td (Hello) Tj ET\n")
 
 	_, err := CompressPDF(context.Background(), pdf, 150)
-	var bad *badInputError
+	var bad *pdfcore.BadInputError
 	if !errors.As(err, &bad) {
-		t.Fatalf("expected a badInputError for an out-of-range quality, got %T: %v", err, err)
+		t.Fatalf("expected a BadInputError for an out-of-range quality, got %T: %v", err, err)
 	}
 }
 
