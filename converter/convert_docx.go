@@ -1,5 +1,5 @@
 // convert_docx.go - minimal .docx (OOXML WordprocessingML) writer.
-package conversion
+package converter
 
 import (
 	"archive/zip"

@@ -6,7 +6,7 @@
 // to keep long paragraphs from running off the page. All pages are
 // stacked into one tall canvas (rather than one file per page, or a zip
 // of several) so a multi-page PDF still downloads as one file.
-package conversion
+package converter
 
 import (
 	"fmt"

@@ -1,5 +1,5 @@
 // convert_txt.go - plain-text (.txt) output.
-package conversion
+package converter
 
 import "strings"
 

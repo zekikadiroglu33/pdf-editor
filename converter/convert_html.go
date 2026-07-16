@@ -1,5 +1,5 @@
 // convert_html.go - minimal, dependency-free HTML output.
-package conversion
+package converter
 
 import "strings"
 

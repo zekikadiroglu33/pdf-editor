@@ -18,7 +18,7 @@
 // convert_html.go, convert_svg.go, convert_xlsx.go, convert_pptx.go)
 // only turns the resulting per-page paragraph lists into its own file
 // bytes.
-package conversion
+package converter
 
 import (
 	"context"

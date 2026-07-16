@@ -1,5 +1,5 @@
 // Regression tests for the PDF -> various-format converter (convert*.go).
-package conversion
+package converter
 
 import (
 	"archive/zip"

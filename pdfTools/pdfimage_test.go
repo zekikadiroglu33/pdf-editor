@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"testing"
 
-	"pdfer/conversion"
+	"pdfer/converter"
 	"pdfer/pdfcore"
 	"pdfer/pdftestutil"
 )
@@ -76,7 +76,7 @@ func TestAddImageToPDFEmbedsJPEG(t *testing.T) {
 
 	// Rasterize and sample a center pixel to confirm the image actually
 	// renders (not just that the right operators are present).
-	images, err := conversion.RasterizePDF(context.Background(), out, "png")
+	images, err := converter.RasterizePDF(context.Background(), out, "png")
 	if err != nil {
 		t.Fatalf("RasterizePDF: %v", err)
 	}

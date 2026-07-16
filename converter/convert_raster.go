@@ -12,7 +12,7 @@
 // conversion format or for editing, so their absence only disables these
 // four formats (see the pdftoppm/cwebp checks in main's startup and
 // pdfcore.UnavailableError below), not the whole server.
-package conversion
+package converter
 
 import (
 	"archive/zip"

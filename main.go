@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"pdfer/conversion"
+	"pdfer/converter"
 	"pdfer/editor"
 	pdftools "pdfer/pdfTools"
 )
@@ -54,7 +54,7 @@ func main() {
 
 	convertLimiter := newConcurrencyLimiter(8)
 	convertRateLimiter := newRateLimiter(0.5, 15)
-	convertHandler := convertLimiter.middleware(rateLimitMiddleware(convertRateLimiter, http.HandlerFunc(conversion.HandleConvert)))
+	convertHandler := convertLimiter.middleware(rateLimitMiddleware(convertRateLimiter, http.HandlerFunc(converter.HandleConvert)))
 
 	// The five qpdf-backed page/document tools (rotate, merge, split,
 	// delete-pages, compress - see pdfTools/pdftools.go) share one limiter
