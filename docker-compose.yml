@@ -2,6 +2,8 @@ services:
   pdfer:
     build: .
     restart: unless-stopped
+    environment:
+      - GA_MEASUREMENT_ID=${GA_MEASUREMENT_ID:-}
     expose:
       - "8080"
     # No "ports:" here on purpose - only Caddy is reachable from outside
