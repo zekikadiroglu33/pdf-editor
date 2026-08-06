@@ -7,7 +7,7 @@ COPY static ./static
 COPY pdfcore ./pdfcore
 COPY pdftestutil ./pdftestutil
 COPY editor ./editor
-COPY conversion ./conversion
+COPY converter ./converter
 COPY pdfTools ./pdfTools
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /pdfer .
 
