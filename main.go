@@ -6,8 +6,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -25,7 +27,55 @@ import (
 //go:embed static
 var staticFS embed.FS
 
+// gaSnippetPlaceholder marks where staticHandler injects (or blanks out)
+// the Google Analytics snippet in each HTML page's <head>.
+const gaSnippetPlaceholder = "<!--GA_SNIPPET-->"
+
+// staticPages lists the top-level HTML files that get the GA snippet
+// injected. Other embedded assets (css/js/images/robots.txt/...) are
+// served as-is via http.FileServer.
+var staticPages = []string{"index.html", "convert.html", "tools.html"}
+
+// staticHandler serves the embedded static/ tree, rewriting
+// gaSnippetPlaceholder in each of staticPages once at startup - not per
+// request, since the embedded file set never changes at runtime. If gaID
+// is empty (GA_MEASUREMENT_ID unset), the placeholder is just stripped.
+func staticHandler(fsys fs.FS, gaID string) http.Handler {
+	snippet := ""
+	if gaID != "" {
+		snippet = fmt.Sprintf(`<script async src="https://www.googletagmanager.com/gtag/js?id=%s"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', %q);
+</script>`, gaID, gaID)
+	}
+
+	rendered := make(map[string][]byte, len(staticPages))
+	for _, name := range staticPages {
+		data, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			log.Fatalf("static/%s: %v", name, err)
+		}
+		rendered["/"+name] = bytes.Replace(data, []byte(gaSnippetPlaceholder), []byte(snippet), 1)
+	}
+	rendered["/"] = rendered["/index.html"]
+
+	fileServer := http.FileServer(http.FS(fsys))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if data, ok := rendered[r.URL.Path]; ok {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write(data)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
 func main() {
+	loadDotEnv(".env")
+
 	if _, err := exec.LookPath("qpdf"); err != nil {
 		log.Fatal("qpdf not found in PATH - install it first (apt install qpdf / brew install qpdf)")
 	}
@@ -81,7 +131,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.FS(static)))
+	mux.Handle("/", staticHandler(static, os.Getenv("GA_MEASUREMENT_ID")))
 	mux.Handle("/api/edit", editHandler)
 	mux.Handle("/api/convert", convertHandler)
 	mux.Handle("/api/rotate", toolsMiddleware(pdftools.HandleRotate))
