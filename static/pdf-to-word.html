@@ -24,7 +24,7 @@
     <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — PDF to Word Converter Online Free</span></h1><span class="badge">Free</span></div>
     <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
+  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
     <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
     <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
@@ -93,7 +93,7 @@
   <section class="card landing-section">
     <h2 class="card-title">How it works</h2>
     <ol>
-      <li>Your PDF is normalized with <code>qpdf</code>, then each page's text is decoded and its actual on-page position tracked, so lines can be told apart from paragraphs.</li>
+      <li>Your PDF is normalized server-side, then each page's text is decoded and its actual on-page position tracked, so lines can be told apart from paragraphs.</li>
       <li>Consecutive lines are grouped into paragraphs using the same heuristic tools like <code>pdftotext -layout</code> use: an ordinary line-wrap joins with a space, and a bigger gap (or a move back up the page) starts a new paragraph.</li>
       <li>The resulting paragraphs are written out as minimal OOXML WordprocessingML — one <code>&lt;w:p&gt;</code> per paragraph, with an explicit page break between pages — and streamed back as a .docx file.</li>
     </ol>

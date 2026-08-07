@@ -81,7 +81,7 @@
     <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Edit PDF Online Free: Find &amp; Replace Text</span></h1><span class="badge">Free</span></div>
     <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
+  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
     <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
     <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
@@ -158,9 +158,9 @@
   <section class="card landing-section">
     <h2 class="card-title">How it works</h2>
     <ol>
-      <li>Your PDF is normalized with <code>qpdf</code> into a classic, uncompressed file, so its text operators become plain, searchable bytes.</li>
+      <li>Your PDF is normalized into a classic, uncompressed file, so its text becomes plain, searchable bytes.</li>
       <li>Your find/replace text is transcoded into the same single-byte encoding the PDF's font uses (Latin/WinAnsi by default, or Windows-1254 for Turkish), then matched and replaced byte-for-byte inside every text stream, with the replacement properly escaped for PDF syntax.</li>
-      <li>The file is rebuilt with a fresh cross-reference table and recompressed with <code>qpdf</code>, so the result opens cleanly in any PDF viewer.</li>
+      <li>The file is rebuilt with a fresh cross-reference table and recompressed, so the result opens cleanly in any PDF viewer.</li>
       <li>Nothing is written to disk on the server — the edited file is streamed straight back to your browser.</li>
     </ol>
   </section>

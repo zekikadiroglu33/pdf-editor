@@ -4,16 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compress PDF Online Free — Reduce File Size | pdfer</title>
-<meta name="description" content="Free online tool to compress a PDF and shrink its file size. Re-encodes streams and images with qpdf — no signup, no watermark, files never stored.">
+<meta name="description" content="Free online tool to compress a PDF and shrink its file size. Re-encodes streams and images to reduce size — no signup, no watermark, files never stored.">
 <link rel="canonical" href="/compress-pdf">
 <meta property="og:type" content="website">
 <meta property="og:url" content="/compress-pdf">
 <meta property="og:title" content="Compress PDF Online Free — pdfer">
-<meta property="og:description" content="Free online tool to compress a PDF and shrink its file size. Re-encodes streams and images with qpdf — no signup, no watermark, files never stored.">
+<meta property="og:description" content="Free online tool to compress a PDF and shrink its file size. Re-encodes streams and images to reduce size — no signup, no watermark, files never stored.">
 <meta property="og:image" content="/logo.svg">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Compress PDF Online Free — pdfer">
-<meta name="twitter:description" content="Free online tool to compress a PDF and shrink its file size. Re-encodes streams and images with qpdf — no signup, no watermark, files never stored.">
+<meta name="twitter:description" content="Free online tool to compress a PDF and shrink its file size. Re-encodes streams and images to reduce size — no signup, no watermark, files never stored.">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <link rel="stylesheet" href="style.css">
 <!--GA_SNIPPET-->
@@ -24,7 +24,7 @@
     <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Compress PDF Online Free</span></h1><span class="badge">Free</span></div>
     <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
+  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
     <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
     <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
@@ -95,7 +95,7 @@
       </div>
       <div id="compressOpts">
         <label for="compressQuality">JPEG quality, 1–100</label>
-        <input type="text" id="compressQuality" placeholder="blank = qpdf default">
+        <input type="text" id="compressQuality" placeholder="blank = default quality">
       </div>
       <div id="watermarkOpts" hidden>
         <label for="watermarkText">Watermark text</label>
@@ -173,9 +173,9 @@
   <section class="card landing-section">
     <h2 class="card-title">How it works</h2>
     <ol>
-      <li>Your PDF is run through <code>qpdf --compress-streams=y --recompress-flate --compression-level=9 --object-streams=generate --optimize-images</code>, optionally with a JPEG quality setting.</li>
-      <li>qpdf re-encodes streams and recognizable images it finds inside the file — it doesn't touch fonts or downsample image resolution, only re-compress what's already there.</li>
-      <li>Because of that, results vary a lot by input: a PDF full of large, uncompressed images can shrink dramatically, while a mostly-text or already-optimized PDF may barely shrink, and a tiny file can even grow slightly from object-stream overhead.</li>
+      <li>Your PDF is processed server-side to re-encode its internal streams, optionally with a JPEG quality setting for embedded images.</li>
+      <li>Recognizable streams and images inside the file are re-encoded — fonts aren't touched and image resolution isn't downsampled, only what's already there gets re-compressed.</li>
+      <li>Because of that, results vary a lot by input: a PDF full of large, uncompressed images can shrink dramatically, while a mostly-text or already-optimized PDF may barely shrink, and a tiny file can even grow slightly from the added overhead.</li>
     </ol>
   </section>
 
@@ -202,11 +202,11 @@
     <h2 class="card-title">FAQ</h2>
     <details>
       <summary>Why didn't my file get much smaller?</summary>
-      <p>Compress only re-encodes streams and images qpdf already recognizes — a mostly-text PDF or one that's already optimized won't shrink much, since there's little left to compress.</p>
+      <p>Compress only re-encodes streams and images it already recognizes — a mostly-text PDF or one that's already optimized won't shrink much, since there's little left to compress.</p>
     </details>
     <details>
       <summary>Can I control the compression level?</summary>
-      <p>Yes — set an optional JPEG quality (1-100) for embedded images; leave it blank to use qpdf's default.</p>
+      <p>Yes — set an optional JPEG quality (1-100) for embedded images; leave it blank to use the default.</p>
     </details>
     <details>
       <summary>Does compressing reduce image resolution?</summary>
