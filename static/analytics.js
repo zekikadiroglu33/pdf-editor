@@ -17,5 +17,8 @@
   window.dataLayer = window.dataLayer || [];
   window.gtag = function () { dataLayer.push(arguments); };
   gtag('js', new Date());
-  gtag('config', gaID);
+  // Explicitly on (not left to the GA4 property's own Admin > Data
+  // Settings toggle) - enables Google Signals: cross-device reporting,
+  // remarketing audiences, and demographics/interest reports.
+  gtag('config', gaID, { allow_google_signals: true });
 })();
