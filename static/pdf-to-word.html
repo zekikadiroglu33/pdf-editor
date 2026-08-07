@@ -50,10 +50,10 @@
       <input type="file" id="convFile" accept="application/pdf" hidden>
 
       <label for="convFormat">Convert to</label>
-      <div class="format-grid" id="convFormat" style="grid-template-columns: 1fr;">
+      <div class="format-grid single-col" id="convFormat">
         <button type="button" class="format-opt active" data-format="docx" data-ext=".docx" data-icon="📝">📝 Word (.docx)</button>
       </div>
-      <p class="hint" id="rasterHint" style="display:none">Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
+      <p class="hint" id="rasterHint" hidden>Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
       <p class="hint">Need PowerPoint, Excel, HTML, plain text, or an image format instead? <a href="/convert.html">See all conversion formats →</a></p>
 
       <label for="convLang">Language</label>
@@ -72,7 +72,7 @@
         <span class="icon">🗎</span>
         <span>Your converted file will appear here.</span>
       </div>
-      <div id="convResult" style="display:none">
+      <div id="convResult" hidden>
         <div class="result-doc">
           <span class="result-doc-icon" id="convResultIcon">📝</span>
           <div class="result-doc-info">
