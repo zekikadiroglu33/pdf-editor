@@ -69,14 +69,19 @@ func loggingMiddleware(next http.Handler) http.Handler {
 // ---------------------------------------------------------------------------
 
 // securityHeadersMiddleware sends a strict CSP plus standard hardening
-// headers. script-src is 'self' only (all JS, including pdf.js, is
-// self-hosted under /static - see README); style-src allows inline
-// because index.html's CSS lives in a single inline <style> block.
+// headers. script-src is 'self' plus Google Analytics' own script host
+// (all first-party JS, including pdf.js, is still self-hosted under
+// /static - see README; analytics.js is the one file that, only when
+// GA_MEASUREMENT_ID is set, dynamically loads a script from that host).
+// style-src allows inline because index.html's CSS lives in a single
+// inline <style> block. connect-src/img-src additions are GA's own
+// beacon/collect endpoints - 'unsafe-inline' is never needed anywhere.
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const csp = "default-src 'self'; " +
-		"script-src 'self'; " +
+		"script-src 'self' https://www.googletagmanager.com; " +
 		"style-src 'self' 'unsafe-inline'; " +
-		"img-src 'self' data: blob:; " +
+		"img-src 'self' data: blob: https://www.google-analytics.com; " +
+		"connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com; " +
 		"worker-src 'self' blob:; " +
 		"frame-src 'self' blob:; " +
 		"object-src 'none'; " +

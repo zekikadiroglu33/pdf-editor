@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF to Word Converter Online Free — .docx | pdfer</title>
+<meta name="description" content="Free online PDF to Word converter. Extract a PDF's text into an editable .docx file, in your browser. No signup, no watermark, files never stored.">
+<link rel="canonical" href="/pdf-to-word">
+<meta property="og:type" content="website">
+<meta property="og:url" content="/pdf-to-word">
+<meta property="og:title" content="PDF to Word Converter Online Free — pdfer">
+<meta property="og:description" content="Free online PDF to Word converter. Extract a PDF's text into an editable .docx file, in your browser. No signup, no watermark, files never stored.">
+<meta property="og:image" content="/logo.svg">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="PDF to Word Converter Online Free — pdfer">
+<meta name="twitter:description" content="Free online PDF to Word converter. Extract a PDF's text into an editable .docx file, in your browser. No signup, no watermark, files never stored.">
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<link rel="stylesheet" href="style.css">
+<!--GA_SNIPPET-->
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — PDF to Word Converter Online Free</span></h1><span class="badge">Free</span></div>
+    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
+  </div>
+  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
+  <ul class="privacy-strip">
+    <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
+    <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
+    <li><span class="privacy-icon">✓</span> Upload, edit or convert, download — that's it</li>
+  </ul>
+
+  <nav class="nav">
+    <a href="/">🏠 Home</a>
+    <a href="/edit-pdf">✎ Edit</a>
+    <a href="/convert.html" class="active">⇄ Convert</a>
+    <a href="/tools.html">🛠 Tools</a>
+  </nav>
+
+  <div class="layout">
+    <section class="card">
+      <h2 class="card-title">PDF to Word</h2>
+      <p class="hint">Best-effort text extraction: wrapped lines are stitched back into paragraphs, but columns, tables and images are not reconstructed. Scanned/image-only PDFs have no text to convert.</p>
+
+      <div class="drop" id="convDrop">
+        <span class="drop-icon">📄</span>
+        <span class="drop-text">Drop a PDF here or click to choose</span>
+      </div>
+      <input type="file" id="convFile" accept="application/pdf" hidden>
+
+      <label for="convFormat">Convert to</label>
+      <div class="format-grid" id="convFormat" style="grid-template-columns: 1fr;">
+        <button type="button" class="format-opt active" data-format="docx" data-ext=".docx" data-icon="📝">📝 Word (.docx)</button>
+      </div>
+      <p class="hint" id="rasterHint" style="display:none">Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
+      <p class="hint">Need PowerPoint, Excel, HTML, plain text, or an image format instead? <a href="/convert.html">See all conversion formats →</a></p>
+
+      <label for="convLang">Language</label>
+      <select id="convLang">
+        <option value="latin">Latin / English (default)</option>
+        <option value="turkish">Turkish</option>
+      </select>
+
+      <button id="convGo" disabled>Convert to .docx</button>
+      <div id="convStatus"></div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">Output</h2>
+      <div class="empty-preview" id="convEmptyPreview">
+        <span class="icon">🗎</span>
+        <span>Your converted file will appear here.</span>
+      </div>
+      <div id="convResult" style="display:none">
+        <div class="result-doc">
+          <span class="result-doc-icon" id="convResultIcon">📝</span>
+          <div class="result-doc-info">
+            <strong id="convResultName">converted.docx</strong>
+            <span id="convMeta"></span>
+          </div>
+        </div>
+        <a id="convDl" class="download-link" download="converted.docx">⬇ Download</a>
+      </div>
+    </section>
+  </div>
+
+  <section class="card landing-section">
+    <h2 class="card-title">What it does</h2>
+    <p>PDF to Word extracts the text from your PDF and rebuilds it as an editable Microsoft Word (.docx) file, right in your browser — no software to install.</p>
+  </section>
+
+  <section class="card landing-section">
+    <h2 class="card-title">How it works</h2>
+    <ol>
+      <li>Your PDF is normalized with <code>qpdf</code>, then each page's text is decoded and its actual on-page position tracked, so lines can be told apart from paragraphs.</li>
+      <li>Consecutive lines are grouped into paragraphs using the same heuristic tools like <code>pdftotext -layout</code> use: an ordinary line-wrap joins with a space, and a bigger gap (or a move back up the page) starts a new paragraph.</li>
+      <li>The resulting paragraphs are written out as minimal OOXML WordprocessingML — one <code>&lt;w:p&gt;</code> per paragraph, with an explicit page break between pages — and streamed back as a .docx file.</li>
+    </ol>
+  </section>
+
+  <section class="card landing-section">
+    <h2 class="card-title">Benefits</h2>
+    <ul class="benefits-grid">
+      <li>Free, no account or sign-up</li>
+      <li>Opens directly in Word, Google Docs, or LibreOffice</li>
+      <li>Files never stored on the server</li>
+      <li>Optional Turkish character encoding support</li>
+    </ul>
+  </section>
+
+  <section class="card landing-section">
+    <h2 class="card-title">Examples</h2>
+    <ul class="examples-list">
+      <li>Turn a PDF report into a Word document so you can edit and reformat it.</li>
+      <li>Extract the text of an emailed PDF letter to reuse in a new document.</li>
+      <li>Convert a PDF form's instructions into Word for markup and comments.</li>
+    </ul>
+  </section>
+
+  <section class="card landing-section faq">
+    <h2 class="card-title">FAQ</h2>
+    <details>
+      <summary>Will my tables, columns, or images be preserved?</summary>
+      <p>No — this is best-effort text extraction, not layout reconstruction. Multi-column layouts and tables come out as a linear sequence of paragraphs, and images aren't carried over at all.</p>
+    </details>
+    <details>
+      <summary>Does it work on scanned PDFs?</summary>
+      <p>No — a scanned or image-only PDF has no underlying text to extract. You'd need to run OCR on it first.</p>
+    </details>
+    <details>
+      <summary>Why is a sentence split into two paragraphs?</summary>
+      <p>Paragraphs are inferred from vertical line spacing, so unusual line spacing in the source PDF can occasionally be misread as a paragraph break.</p>
+    </details>
+    <details>
+      <summary>Can I convert to PowerPoint, Excel, or an image instead?</summary>
+      <p>Yes — <a href="/convert.html">the full converter</a> supports pptx, xlsx, HTML, plain text, SVG, PNG, JPEG, TIFF, and WEBP too.</p>
+    </details>
+    <details>
+      <summary>Is my file stored anywhere?</summary>
+      <p>No, files are processed in memory only and never written to persistent storage.</p>
+    </details>
+  </section>
+
+  <section class="card landing-section other-tools">
+    <h2 class="card-title">Other free PDF tools</h2>
+    <div class="tool-links">
+      <a href="/edit-pdf">✎ Edit PDF</a>
+      <a href="/merge-pdf">🔗 Merge PDF</a>
+      <a href="/split-pdf">✂ Split PDF</a>
+      <a href="/compress-pdf">📦 Compress PDF</a>
+      <a href="/rotate-pdf">↻ Rotate PDF</a>
+      <a href="/tools.html">🛠 All PDF tools</a>
+      <a href="/convert.html">⇄ All conversion formats</a>
+    </div>
+  </section>
+</div>
+
+<script src="theme.js"></script>
+<script src="convert.js"></script>
+</body>
+</html>
