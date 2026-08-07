@@ -82,10 +82,12 @@ The image is a multi-stage build (Go build stage + a `debian:bookworm-slim` runt
 `docker-compose.yml` + `Caddyfile` bundle the app with [Caddy](https://caddyserver.com) as a reverse proxy, which gets you free, automatic HTTPS (Let's Encrypt) with no manual certificate handling. `pdfer` itself is not published to the host — only Caddy is reachable from outside, on 80/443.
 
 1. Point a DNS A/AAAA record for your domain at the server's IP.
-2. `cp .env.example .env` and set `DOMAIN=your-domain.com`.
+2. `cp .env.example .env` and set `DOMAIN=your-domain.com` (and `GA_MEASUREMENT_ID`, if you use Google Analytics).
 3. `docker compose up -d --build`
 
 Caddy issues and renews the certificate automatically on first request. Logs: `docker compose logs -f`.
+
+For subsequent deploys, SSH into the server and run `./deploy.sh` from the repo directory — it does `git pull`, `docker compose up -d --build`, then prunes old images. No CI/CD pipeline is involved; there's nothing to authenticate beyond your own SSH access.
 
 ### Production hardening
 
