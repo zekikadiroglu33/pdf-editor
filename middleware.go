@@ -73,13 +73,16 @@ func loggingMiddleware(next http.Handler) http.Handler {
 // (all first-party JS, including pdf.js, is still self-hosted under
 // /static - see README; analytics.js is the one file that, only when
 // GA_MEASUREMENT_ID is set, dynamically loads a script from that host).
-// style-src allows inline because index.html's CSS lives in a single
-// inline <style> block. connect-src/img-src additions are GA's own
-// beacon/collect endpoints - 'unsafe-inline' is never needed anywhere.
+// style-src is 'self' only - every page's CSS lives in style.css, and
+// visibility toggles in app.js/convert.js/tools.js set individual
+// element.style.display properties, which CSP's style-src never governs
+// (only <style> elements, style="" attributes, and .style.cssText are).
+// connect-src/img-src additions are GA's own beacon/collect endpoints -
+// 'unsafe-inline' is never needed anywhere in this CSP.
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const csp = "default-src 'self'; " +
 		"script-src 'self' https://www.googletagmanager.com; " +
-		"style-src 'self' 'unsafe-inline'; " +
+		"style-src 'self'; " +
 		"img-src 'self' data: blob: https://www.google-analytics.com; " +
 		"connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com; " +
 		"worker-src 'self' blob:; " +

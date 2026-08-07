@@ -65,7 +65,7 @@
         <button type="button" class="format-opt" data-format="tiff" data-ext=".tif" data-icon="🖼">TIFF</button>
         <button type="button" class="format-opt" data-format="webp" data-ext=".webp" data-icon="🖼">WEBP</button>
       </div>
-      <p class="hint" id="rasterHint" style="display:none">Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
+      <p class="hint" id="rasterHint" hidden>Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
 
       <label for="convLang">Language</label>
       <select id="convLang">
@@ -83,7 +83,7 @@
         <span class="icon">🗎</span>
         <span>Your converted file will appear here.</span>
       </div>
-      <div id="convResult" style="display:none">
+      <div id="convResult" hidden>
         <div class="result-doc">
           <span class="result-doc-icon" id="convResultIcon">📝</span>
           <div class="result-doc-info">
