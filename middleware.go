@@ -78,17 +78,17 @@ func loggingMiddleware(next http.Handler) http.Handler {
 // element.style.display properties, which CSP's style-src never governs
 // (only <style> elements, style="" attributes, and .style.cssText are).
 // connect-src/img-src additions are GA's own beacon/collect endpoints -
-// 'unsafe-inline' is never needed anywhere in this CSP. analytics.js
-// explicitly sets allow_google_signals: false (ads personalization /
-// cross-device tracking stays off), which keeps GA's own network calls
-// limited to plain pageview/event collection on these two domains - no
-// googletagmanager.com image-pixel paths or google.com/analytics.google.com
-// collect endpoints, which are only reachable once Google Signals is on.
+// 'unsafe-inline' is never needed anywhere in this CSP. gtag.js hits
+// googletagmanager.com's own /a and /td image-pixel paths as part of its
+// normal, non-Signals collection too (allow_google_signals in
+// analytics.js only controls what Google does with the data once
+// collected, not which network paths the script uses), so
+// googletagmanager.com needs to be in img-src alongside google-analytics.com.
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const csp = "default-src 'self'; " +
 		"script-src 'self' https://www.googletagmanager.com; " +
 		"style-src 'self'; " +
-		"img-src 'self' data: blob: https://www.google-analytics.com; " +
+		"img-src 'self' data: blob: https://www.google-analytics.com https://www.googletagmanager.com; " +
 		"connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com; " +
 		"worker-src 'self' blob:; " +
 		"frame-src 'self' blob:; " +
