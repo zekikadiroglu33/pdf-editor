@@ -24,7 +24,7 @@
     <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Merge PDF Files Online Free</span></h1><span class="badge">Free</span></div>
     <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
+  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
     <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
     <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
@@ -95,7 +95,7 @@
       </div>
       <div id="compressOpts" hidden>
         <label for="compressQuality">JPEG quality, 1–100</label>
-        <input type="text" id="compressQuality" placeholder="blank = qpdf default">
+        <input type="text" id="compressQuality" placeholder="blank = default quality">
       </div>
       <div id="watermarkOpts" hidden>
         <label for="watermarkText">Watermark text</label>
@@ -173,8 +173,8 @@
   <section class="card landing-section">
     <h2 class="card-title">How it works</h2>
     <ol>
-      <li>Select 2 or more PDF files — pdfer sends them straight to <code>qpdf --empty --pages ...</code>, which concatenates every page from every file, in the order you added them.</li>
-      <li>Nothing else touches your files: no re-encoding, no quality loss — qpdf is the same production-grade tool many document workflows already rely on for merging.</li>
+      <li>Select 2 or more PDF files — pdfer concatenates every page from every file server-side, in the order you added them.</li>
+      <li>Nothing else touches your files: no re-encoding, no quality loss — pages are combined exactly as they were in the originals.</li>
       <li>The merged PDF is streamed straight back to your browser; nothing is written to disk on the server.</li>
     </ol>
   </section>
@@ -210,7 +210,7 @@
     </details>
     <details>
       <summary>Does merging reduce PDF quality?</summary>
-      <p>No — qpdf concatenates the original pages as-is; nothing is re-encoded or re-rendered.</p>
+      <p>No — the original pages are concatenated as-is; nothing is re-encoded or re-rendered.</p>
     </details>
     <details>
       <summary>Can I merge PDFs with different page sizes?</summary>
