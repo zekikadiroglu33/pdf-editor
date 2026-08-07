@@ -6,10 +6,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"embed"
-	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -27,16 +25,10 @@ import (
 //go:embed static
 var staticFS embed.FS
 
-// gaSnippetPlaceholder marks where staticHandler injects (or blanks out)
-// the Google Analytics bootstrap in each HTML page's <head>.
-const gaSnippetPlaceholder = "<!--GA_SNIPPET-->"
-
 // pageRoutes maps each clean, extensionless URL this site serves to the
 // source file under static/ that renders it - a page's URL is a routing
-// decision, not a filename constraint. Every one of these gets the
-// GA-snippet placeholder rendered once at startup; every other embedded
-// asset (css/js/images/robots.txt/...) is served as-is via
-// http.FileServer.
+// decision, not a filename constraint. Every other embedded asset
+// (css/js/images/robots.txt/...) is served as-is via http.FileServer.
 var pageRoutes = map[string]string{
 	"/":             "hub.html",
 	"/edit-pdf":     "edit-pdf.html",
@@ -49,28 +41,20 @@ var pageRoutes = map[string]string{
 	"/tools.html":   "tools.html",
 }
 
-// staticHandler serves the embedded static/ tree, rewriting
-// gaSnippetPlaceholder in each of pageRoutes once at startup - not per
-// request, since the embedded file set never changes at runtime. If gaID
-// is empty (GA_MEASUREMENT_ID unset), the placeholder is just stripped.
-// The snippet itself is only a same-origin <meta> tag plus a same-origin
-// <script src="analytics.js">, which is the one file that (only when the
-// meta tag is present) dynamically loads Google's gtag.js - see
-// analytics.js and the CSP in middleware.go.
-func staticHandler(fsys fs.FS, gaID string) http.Handler {
-	snippet := ""
-	if gaID != "" {
-		snippet = fmt.Sprintf(`<meta name="ga-id" content=%q>
-<script src="analytics.js"></script>`, gaID)
-	}
-
+// staticHandler serves the embedded static/ tree, resolving each of
+// pageRoutes to its file once at startup - not per request, since the
+// embedded file set never changes at runtime. Google Analytics is
+// entirely a static-asset concern (see analytics.js): every page loads
+// it unconditionally via a plain <script> tag, so nothing server-side
+// needs to know about it.
+func staticHandler(fsys fs.FS) http.Handler {
 	rendered := make(map[string][]byte, len(pageRoutes))
 	for urlPath, file := range pageRoutes {
 		data, err := fs.ReadFile(fsys, file)
 		if err != nil {
 			log.Fatalf("static/%s: %v", file, err)
 		}
-		rendered[urlPath] = bytes.Replace(data, []byte(gaSnippetPlaceholder), []byte(snippet), 1)
+		rendered[urlPath] = data
 	}
 
 	fileServer := http.FileServer(http.FS(fsys))
@@ -85,8 +69,6 @@ func staticHandler(fsys fs.FS, gaID string) http.Handler {
 }
 
 func main() {
-	loadDotEnv(".env")
-
 	if _, err := exec.LookPath("qpdf"); err != nil {
 		log.Fatal("qpdf not found in PATH - install it first (apt install qpdf / brew install qpdf)")
 	}
@@ -142,7 +124,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/", staticHandler(static, os.Getenv("GA_MEASUREMENT_ID")))
+	mux.Handle("/", staticHandler(static))
 	mux.Handle("/api/edit", editHandler)
 	mux.Handle("/api/convert", convertHandler)
 	mux.Handle("/api/rotate", toolsMiddleware(pdftools.HandleRotate))

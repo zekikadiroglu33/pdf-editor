@@ -82,7 +82,7 @@ The image is a multi-stage build (Go build stage + a `debian:bookworm-slim` runt
 `docker-compose.yml` + `Caddyfile` bundle the app with [Caddy](https://caddyserver.com) as a reverse proxy, which gets you free, automatic HTTPS (Let's Encrypt) with no manual certificate handling. `pdfer` itself is not published to the host — only Caddy is reachable from outside, on 80/443.
 
 1. Point a DNS A/AAAA record for your domain at the server's IP.
-2. `cp .env.example .env` and set `DOMAIN=your-domain.com` (and `GA_MEASUREMENT_ID`, if you use Google Analytics).
+2. `cp .env.example .env` and set `DOMAIN=your-domain.com`.
 3. `docker compose up -d --build`
 
 Caddy issues and renews the certificate automatically on first request. Logs: `docker compose logs -f`.
@@ -96,7 +96,7 @@ The server is meant to be safe to expose directly to the public internet with no
 - Per-IP rate limiting and a process-wide concurrency cap on `/api/edit` (each request spawns two `qpdf` subprocesses).
 - Request timeouts throughout: HTTP server read/write/idle timeouts, and a bounded context on every `qpdf` call and the overall edit pipeline, so a hung or adversarial upload can't tie up a worker indefinitely.
 - Panic recovery, structured request logging, and graceful shutdown on `SIGTERM`.
-- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js and the UI's Space Grotesk webfont are both self-hosted under `static/vendor/`; Google Analytics' own domains are the one explicit allowlist exception, only relevant if `GA_MEASUREMENT_ID` is set) plus standard security headers.
+- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js and the UI's Space Grotesk webfont are both self-hosted under `static/vendor/`; Google Analytics' own domains are the one explicit allowlist exception, since `static/analytics.js` loads `gtag.js`) plus standard security headers.
 - TLS is expected to be terminated in front of the app (reverse proxy / platform load balancer) — the binary itself serves plain HTTP.
 
 ### Sizing
@@ -376,7 +376,7 @@ pdf-editor/
     ├── tools.html            # "/tools.html" - full PDF Tools page markup - links style.css, loads only theme.js + tools.js (no pdf.js)
     ├── style.css             # shared design system (theme vars, layout, cards, buttons, form controls, landing-page sections) for every page
     ├── theme.js              # shared light/dark toggle logic for every page
-    ├── analytics.js          # loads Google Analytics only if a <meta name="ga-id"> tag is present (see GA_MEASUREMENT_ID below) - external file so CSP never needs 'unsafe-inline'
+    ├── analytics.js          # loads Google Analytics (gtag.js) - measurement ID is a constant in this file, loaded unconditionally on every page like theme.js; external file so CSP never needs 'unsafe-inline'; skips itself on localhost
     ├── app.js                # Editor page logic: PDF.js preview, drag-to-select, click-to-edit, zoom, undo
     ├── tools.js              # PDF Tools page logic: rotate/merge/split/delete-pages/compress/watermark/crop/add-image/compress-images, plus the PDFER_LOCK_TOOL single-tool mode the dedicated landing pages use
     ├── convert.js            # Converter page logic: format picker, upload/convert/download
