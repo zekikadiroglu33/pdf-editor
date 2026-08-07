@@ -3,16 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pdfer — Free PDF Editor</title>
-<meta name="description" content="Free online PDF text editor. Upload a PDF, find and replace text right in the page preview, review every change, then download — no signup, no watermark.">
-<link rel="canonical" href="/">
+<title>Edit PDF Online Free — Find &amp; Replace Text | pdfer</title>
+<meta name="description" content="Free online PDF editor. Upload a PDF, find and replace text right in the page preview, review every change highlighted, then download — no signup, no watermark.">
+<link rel="canonical" href="/edit-pdf">
 <meta property="og:type" content="website">
-<meta property="og:title" content="pdfer — Free PDF Editor">
-<meta property="og:description" content="Free online PDF text editor. Upload a PDF, find and replace text right in the page preview, review every change, then download — no signup, no watermark.">
+<meta property="og:url" content="/edit-pdf">
+<meta property="og:title" content="Edit PDF Online Free — pdfer">
+<meta property="og:description" content="Free online PDF editor. Upload a PDF, find and replace text right in the page preview, review every change highlighted, then download — no signup, no watermark.">
 <meta property="og:image" content="/logo.svg">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="pdfer — Free PDF Editor">
-<meta name="twitter:description" content="Free online PDF text editor. Upload a PDF, find and replace text right in the page preview, review every change, then download — no signup, no watermark.">
+<meta name="twitter:title" content="Edit PDF Online Free — pdfer">
+<meta name="twitter:description" content="Free online PDF editor. Upload a PDF, find and replace text right in the page preview, review every change highlighted, then download — no signup, no watermark.">
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <link rel="stylesheet" href="style.css">
 <style>
@@ -77,7 +78,7 @@
 <body>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Free PDF Editor</span></h1><span class="badge">Free</span></div>
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Edit PDF Online Free: Find &amp; Replace Text</span></h1><span class="badge">Free</span></div>
     <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
   </div>
   <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads. Powered by a Go backend.</p>
@@ -88,7 +89,8 @@
   </ul>
 
   <nav class="nav">
-    <a href="/" class="active">✎ Edit</a>
+    <a href="/">🏠 Home</a>
+    <a href="/edit-pdf" class="active">✎ Edit</a>
     <a href="/convert.html">⇄ Convert</a>
     <a href="/tools.html">🛠 Tools</a>
   </nav>
@@ -147,6 +149,77 @@
     <a id="dl" class="download-link" download="edited.pdf">⬇ Download edited.pdf</a>
     <iframe id="preview" title="Edited PDF preview"></iframe>
   </div>
+
+  <section class="card landing-section">
+    <h2 class="card-title">What it does</h2>
+    <p>pdfer's editor finds and replaces text directly inside a PDF, in your browser, with no software to install. Drop in a file, either type the text to find or drag-select it right on the rendered page, type its replacement, and review every change — highlighted in yellow — before you download the edited file.</p>
+  </section>
+
+  <section class="card landing-section">
+    <h2 class="card-title">How it works</h2>
+    <ol>
+      <li>Your PDF is normalized with <code>qpdf</code> into a classic, uncompressed file, so its text operators become plain, searchable bytes.</li>
+      <li>Your find/replace text is transcoded into the same single-byte encoding the PDF's font uses (Latin/WinAnsi by default, or Windows-1254 for Turkish), then matched and replaced byte-for-byte inside every text stream, with the replacement properly escaped for PDF syntax.</li>
+      <li>The file is rebuilt with a fresh cross-reference table and recompressed with <code>qpdf</code>, so the result opens cleanly in any PDF viewer.</li>
+      <li>Nothing is written to disk on the server — the edited file is streamed straight back to your browser.</li>
+    </ol>
+  </section>
+
+  <section class="card landing-section">
+    <h2 class="card-title">Benefits</h2>
+    <ul class="benefits-grid">
+      <li>Free, no account or sign-up required</li>
+      <li>Files are processed in memory and never stored on the server</li>
+      <li>Every change is highlighted so you can review before downloading</li>
+      <li>Undo up to 5 steps, right in your browser tab</li>
+    </ul>
+  </section>
+
+  <section class="card landing-section">
+    <h2 class="card-title">Examples</h2>
+    <ul class="examples-list">
+      <li>Update a company name or address across every page of a contract template before sending it out.</li>
+      <li>Correct a misspelled client name on an invoice without recreating the document from scratch.</li>
+      <li>Swap a recurring value throughout a document in one pass using regex mode — e.g. <code>Invoice (\d+)-(\d+)</code> → <code>INV-$2/$1</code>.</li>
+    </ul>
+  </section>
+
+  <section class="card landing-section faq">
+    <h2 class="card-title">FAQ</h2>
+    <details>
+      <summary>Does this work on scanned PDFs?</summary>
+      <p>No — a scanned or image-only PDF has no underlying text layer, so there's nothing to find or replace. You'd need to run OCR on it first.</p>
+    </details>
+    <details>
+      <summary>Will replacing text change the page layout?</summary>
+      <p>Replacement text keeps the original glyph positions, so a much longer replacement can overlap neighboring text. Short, similar-length replacements work best.</p>
+    </details>
+    <details>
+      <summary>Is my file stored anywhere?</summary>
+      <p>No. Your PDF is processed in memory for the duration of the request only and is never written to persistent storage.</p>
+    </details>
+    <details>
+      <summary>Why didn't my search text match?</summary>
+      <p>If a phrase is kerned into separate pieces by the original PDF (e.g. "AC" then "ME" as two operators), a search for "ACME" won't match — this depends on how the source document laid out its text, not on your search.</p>
+    </details>
+    <details>
+      <summary>Can I undo a change?</summary>
+      <p>Yes, up to the last 5 edits — but undo is held in your browser tab's memory only, so reload or closing the tab clears it. Download before you navigate away.</p>
+    </details>
+  </section>
+
+  <section class="card landing-section other-tools">
+    <h2 class="card-title">Other free PDF tools</h2>
+    <div class="tool-links">
+      <a href="/merge-pdf">🔗 Merge PDF</a>
+      <a href="/split-pdf">✂ Split PDF</a>
+      <a href="/compress-pdf">📦 Compress PDF</a>
+      <a href="/rotate-pdf">↻ Rotate PDF</a>
+      <a href="/pdf-to-word">📝 PDF to Word</a>
+      <a href="/tools.html">🛠 All PDF tools</a>
+      <a href="/convert.html">⇄ All conversion formats</a>
+    </div>
+  </section>
 </div>
 
 <script src="vendor/pdf.min.js"></script>

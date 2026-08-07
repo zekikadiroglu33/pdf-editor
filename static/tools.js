@@ -107,6 +107,11 @@ function selectTool(tool) {
 toolOpts.forEach(opt => opt.addEventListener('click', () => selectTool(opt.dataset.tool)));
 selectTool('rotate');
 
+// Single-tool landing pages (merge-pdf.html etc.) set this before loading
+// tools.js and hide #toolPicker in their own markup, so the page opens
+// straight on the one tool it's about instead of tools.html's default.
+if (window.PDFER_LOCK_TOOL) selectTool(window.PDFER_LOCK_TOOL);
+
 // Single-file drop, shared by rotate/split/delete/compress (only one of
 // which is visible at a time - see selectTool above).
 const setToolFile = f => {

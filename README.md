@@ -96,7 +96,7 @@ The server is meant to be safe to expose directly to the public internet with no
 - Per-IP rate limiting and a process-wide concurrency cap on `/api/edit` (each request spawns two `qpdf` subprocesses).
 - Request timeouts throughout: HTTP server read/write/idle timeouts, and a bounded context on every `qpdf` call and the overall edit pipeline, so a hung or adversarial upload can't tie up a worker indefinitely.
 - Panic recovery, structured request logging, and graceful shutdown on `SIGTERM`.
-- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js and the UI's Space Grotesk webfont are both self-hosted under `static/vendor/`) plus standard security headers.
+- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js and the UI's Space Grotesk webfont are both self-hosted under `static/vendor/`; Google Analytics' own domains are the one explicit allowlist exception, only relevant if `GA_MEASUREMENT_ID` is set) plus standard security headers.
 - TLS is expected to be terminated in front of the app (reverse proxy / platform load balancer) — the binary itself serves plain HTTP.
 
 ### Sizing
@@ -365,15 +365,24 @@ pdf-editor/
 ├── Caddyfile
 ├── .env.example
 └── static/
-    ├── index.html           # Editor page markup (Edit) - links style.css, loads pdf.js + theme.js + app.js
-    ├── convert.html          # Converter page markup - links style.css, loads only theme.js + convert.js (no pdf.js)
-    ├── tools.html            # PDF Tools page markup - links style.css, loads only theme.js + tools.js (no pdf.js)
-    ├── style.css             # shared design system (theme vars, layout, cards, buttons, form controls) for all three pages
-    ├── theme.js              # shared light/dark toggle logic for all three pages
+    ├── hub.html              # "/" - thin hub page, links to every tool below (SEO: one focused page per keyword, not one homepage trying to rank for all of them)
+    ├── edit-pdf.html         # "/edit-pdf" - Editor page markup (Edit) - links style.css, loads pdf.js + theme.js + app.js, plus landing-page copy (what it does/how it works/benefits/examples/FAQ)
+    ├── merge-pdf.html        # "/merge-pdf" - single-tool landing page, tools.html's widget locked to "merge" via window.PDFER_LOCK_TOOL
+    ├── split-pdf.html        # "/split-pdf" - same pattern, locked to "split"
+    ├── compress-pdf.html     # "/compress-pdf" - same pattern, locked to "compress"
+    ├── rotate-pdf.html       # "/rotate-pdf" - same pattern, locked to "rotate"
+    ├── pdf-to-word.html      # "/pdf-to-word" - convert.html's widget trimmed to the Word format only, plus landing-page copy
+    ├── convert.html          # "/convert.html" - full Converter page markup - links style.css, loads only theme.js + convert.js (no pdf.js)
+    ├── tools.html            # "/tools.html" - full PDF Tools page markup - links style.css, loads only theme.js + tools.js (no pdf.js)
+    ├── style.css             # shared design system (theme vars, layout, cards, buttons, form controls, landing-page sections) for every page
+    ├── theme.js              # shared light/dark toggle logic for every page
+    ├── analytics.js          # loads Google Analytics only if a <meta name="ga-id"> tag is present (see GA_MEASUREMENT_ID below) - external file so CSP never needs 'unsafe-inline'
     ├── app.js                # Editor page logic: PDF.js preview, drag-to-select, click-to-edit, zoom, undo
-    ├── tools.js              # PDF Tools page logic: rotate/merge/split/delete-pages/compress/watermark/crop/add-image/compress-images
+    ├── tools.js              # PDF Tools page logic: rotate/merge/split/delete-pages/compress/watermark/crop/add-image/compress-images, plus the PDFER_LOCK_TOOL single-tool mode the dedicated landing pages use
     ├── convert.js            # Converter page logic: format picker, upload/convert/download
     └── vendor/
         ├── fonts/            # self-hosted Space Grotesk (OFL.txt included) - same strict-CSP reasoning as pdf.js below
         └── ...                # self-hosted PDF.js (required for a strict CSP - no third-party CDN)
 ```
+
+`main.go`'s `pageRoutes` map is what turns these filenames into the clean, extensionless URLs above (`/merge-pdf`, not `/merge-pdf.html`) - see `staticHandler` in `main.go`.

@@ -28,39 +28,50 @@ import (
 var staticFS embed.FS
 
 // gaSnippetPlaceholder marks where staticHandler injects (or blanks out)
-// the Google Analytics snippet in each HTML page's <head>.
+// the Google Analytics bootstrap in each HTML page's <head>.
 const gaSnippetPlaceholder = "<!--GA_SNIPPET-->"
 
-// staticPages lists the top-level HTML files that get the GA snippet
-// injected. Other embedded assets (css/js/images/robots.txt/...) are
-// served as-is via http.FileServer.
-var staticPages = []string{"index.html", "convert.html", "tools.html"}
+// pageRoutes maps each clean, extensionless URL this site serves to the
+// source file under static/ that renders it - a page's URL is a routing
+// decision, not a filename constraint. Every one of these gets the
+// GA-snippet placeholder rendered once at startup; every other embedded
+// asset (css/js/images/robots.txt/...) is served as-is via
+// http.FileServer.
+var pageRoutes = map[string]string{
+	"/":             "hub.html",
+	"/edit-pdf":     "edit-pdf.html",
+	"/merge-pdf":    "merge-pdf.html",
+	"/split-pdf":    "split-pdf.html",
+	"/compress-pdf": "compress-pdf.html",
+	"/rotate-pdf":   "rotate-pdf.html",
+	"/pdf-to-word":  "pdf-to-word.html",
+	"/convert.html": "convert.html",
+	"/tools.html":   "tools.html",
+}
 
 // staticHandler serves the embedded static/ tree, rewriting
-// gaSnippetPlaceholder in each of staticPages once at startup - not per
+// gaSnippetPlaceholder in each of pageRoutes once at startup - not per
 // request, since the embedded file set never changes at runtime. If gaID
 // is empty (GA_MEASUREMENT_ID unset), the placeholder is just stripped.
+// The snippet itself is only a same-origin <meta> tag plus a same-origin
+// <script src="analytics.js">, which is the one file that (only when the
+// meta tag is present) dynamically loads Google's gtag.js - see
+// analytics.js and the CSP in middleware.go.
 func staticHandler(fsys fs.FS, gaID string) http.Handler {
 	snippet := ""
 	if gaID != "" {
-		snippet = fmt.Sprintf(`<script async src="https://www.googletagmanager.com/gtag/js?id=%s"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', %q);
-</script>`, gaID, gaID)
+		snippet = fmt.Sprintf(`<meta name="ga-id" content=%q>
+<script src="analytics.js"></script>`, gaID)
 	}
 
-	rendered := make(map[string][]byte, len(staticPages))
-	for _, name := range staticPages {
-		data, err := fs.ReadFile(fsys, name)
+	rendered := make(map[string][]byte, len(pageRoutes))
+	for urlPath, file := range pageRoutes {
+		data, err := fs.ReadFile(fsys, file)
 		if err != nil {
-			log.Fatalf("static/%s: %v", name, err)
+			log.Fatalf("static/%s: %v", file, err)
 		}
-		rendered["/"+name] = bytes.Replace(data, []byte(gaSnippetPlaceholder), []byte(snippet), 1)
+		rendered[urlPath] = bytes.Replace(data, []byte(gaSnippetPlaceholder), []byte(snippet), 1)
 	}
-	rendered["/"] = rendered["/index.html"]
 
 	fileServer := http.FileServer(http.FS(fsys))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

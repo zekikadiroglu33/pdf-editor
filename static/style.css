@@ -246,3 +246,73 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .result-doc-icon { font-size: 28px; }
 .result-doc-info { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; min-width: 0; }
 .result-doc-info span { color: var(--muted); font-size: 12.5px; }
+
+/* ---------------------------------------------------------------------
+   Landing pages: hub.html's tool-card grid, and the marketing sections
+   (what it does / how it works / benefits / examples / FAQ / other
+   tools) shared by edit-pdf.html, merge-pdf.html, split-pdf.html,
+   compress-pdf.html, rotate-pdf.html and pdf-to-word.html. Reuses the
+   same tokens and .card look as the tool widgets above - a landing
+   page's marketing content is meant to read as part of the same app,
+   not a separate "blog" skin.
+   --------------------------------------------------------------------- */
+
+.hero { text-align: center; margin: 8px 0 28px; }
+.hero h2 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 8px; }
+.hero p { color: var(--muted); font-size: 15px; max-width: 640px; margin: 0 auto; }
+
+.tool-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px;
+  margin-top: 28px;
+}
+.tool-card {
+  display: flex; align-items: center; gap: 12px; padding: 18px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); text-decoration: none; color: var(--text);
+  transition: border-color .15s, transform .15s;
+}
+.tool-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.tool-card .tool-card-icon { font-size: 26px; }
+.tool-card strong { display: block; font-size: 15px; }
+.tool-card span { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+.landing-section { margin-top: 20px; }
+.landing-section p { color: var(--text); font-size: 14.5px; line-height: 1.7; }
+.landing-section ol, .landing-section ul { padding-left: 20px; color: var(--text); font-size: 14.5px; line-height: 1.8; }
+.landing-section li { margin-bottom: 4px; }
+
+.benefits-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;
+}
+.benefits-grid li {
+  list-style: none; margin: 0; padding: 14px 16px;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-md);
+  font-size: 14px; line-height: 1.5;
+}
+
+.examples-list { padding-left: 0; }
+.examples-list li {
+  list-style: none; padding: 12px 0; border-top: 1px solid var(--border); font-size: 14.5px; line-height: 1.6;
+}
+.examples-list li:first-child { border-top: none; padding-top: 0; }
+
+.faq details {
+  border-top: 1px solid var(--border); padding: 14px 0;
+}
+.faq details:first-of-type { border-top: none; padding-top: 0; }
+.faq summary {
+  cursor: pointer; font-weight: 600; font-size: 14.5px; color: var(--text);
+  list-style: none;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::before { content: '+ '; color: var(--accent); font-weight: 700; }
+.faq details[open] summary::before { content: '\2212 '; }
+.faq details p { margin-top: 8px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+.other-tools .tool-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.other-tools .tool-links a {
+  padding: 8px 14px; font-size: 13.5px; font-weight: 600; text-decoration: none;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  transition: border-color .12s;
+}
+.other-tools .tool-links a:hover { border-color: var(--accent); color: var(--accent); }
