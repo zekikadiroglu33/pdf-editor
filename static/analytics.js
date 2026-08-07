@@ -1,13 +1,15 @@
-// Loads Google Analytics (gtag.js) only if a ga-id meta tag with a
-// non-empty value is present - see main.go's GA_MEASUREMENT_ID env var
-// and the GA_SNIPPET placeholder each page's <head> is rendered from.
+// Loads Google Analytics (gtag.js). Entirely a static-asset concern -
+// every page includes this file unconditionally (like theme.js), and
+// the measurement ID is a constant right here, not server-injected -
+// see main.go's staticHandler, which no longer knows anything about GA.
 // Kept as an external file (not an inline <script>) so the site's CSP
 // can stay script-src 'self' plus GA's own domains, instead of needing
 // 'unsafe-inline'.
 (function () {
-  const meta = document.querySelector('meta[name="ga-id"]');
-  const gaID = meta && meta.content;
-  if (!gaID) return;
+  const gaID = 'G-KFDD0LK8JH';
+
+  // Skip on localhost so local dev/test runs never send hits to GA.
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
 
   const s = document.createElement('script');
   s.async = true;
