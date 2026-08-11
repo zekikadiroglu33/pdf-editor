@@ -24,6 +24,7 @@ let convFile = null;
 let convFormat = document.querySelector('.format-opt.active').dataset.format;
 
 const setConvStatus = (msg, cls = '') => { convStatus.textContent = msg; convStatus.className = cls; };
+const errorMsg = err => pdferT('common.errorPrefix', 'Error: ') + err.message;
 
 // The format picker is a row of toggle buttons (not a <select>) so each
 // format's icon is visible at a glance; only one can be active at a time.
@@ -31,16 +32,20 @@ formatOpts.forEach(opt => {
   opt.addEventListener('click', () => {
     formatOpts.forEach(o => o.classList.toggle('active', o === opt));
     convFormat = opt.dataset.format;
-    convGo.textContent = `Convert to ${opt.dataset.ext}`;
+    convGo.textContent = pdferT('convert.convertToExt', 'Convert to {ext}', { ext: opt.dataset.ext });
     rasterHint.style.display = rasterFormats.has(convFormat) ? 'block' : 'none';
     convResult.style.display = 'none';
     convEmptyPreview.style.display = 'flex';
     setConvStatus('');
   });
 });
+// Match the format button's translated text on first paint too, not just
+// after the user clicks a different format (the click handler above is the
+// only other place this text is set).
+convGo.textContent = pdferT('convert.convertToExt', 'Convert to {ext}', { ext: document.querySelector('.format-opt.active').dataset.ext });
 
 const setConvFile = f => {
-  if (!f || f.type !== 'application/pdf') { setConvStatus('Please choose a PDF file.', 'err'); return; }
+  if (!f || f.type !== 'application/pdf') { setConvStatus(pdferT('common.pleaseChoosePdf', 'Please choose a PDF file.'), 'err'); return; }
   convFile = f;
   convResult.style.display = 'none';
   convEmptyPreview.style.display = 'flex';
@@ -82,7 +87,7 @@ convGo.addEventListener('click', async () => {
 
   convGo.disabled = true;
   convResult.style.display = 'none';
-  setConvStatus('Converting…');
+  setConvStatus(pdferT('convert.converting', 'Converting…'));
 
   try {
     const res = await fetch('/api/convert', { method: 'POST', body: form });
@@ -105,13 +110,13 @@ convGo.addEventListener('click', async () => {
     convResultIcon.textContent = isZip ? '📦' : activeOpt.dataset.icon;
     convResultName.textContent = filename;
     convMeta.textContent = isZip
-      ? `${pages} page(s) converted (one image per page, zipped)`
-      : `${pages} page(s) converted`;
+      ? pdferT('convert.pagesConvertedZip', '{pages} page(s) converted (one image per page, zipped)', { pages })
+      : pdferT('convert.pagesConverted', '{pages} page(s) converted', { pages });
     convEmptyPreview.style.display = 'none';
     convResult.style.display = 'block';
-    setConvStatus(`Done — converted ${pages} page(s) to ${filename}.`, 'ok');
+    setConvStatus(pdferT('convert.doneConverted', 'Done — converted {pages} page(s) to {filename}.', { pages, filename }), 'ok');
   } catch (err) {
-    setConvStatus('Error: ' + err.message, 'err');
+    setConvStatus(errorMsg(err), 'err');
   } finally {
     convGo.disabled = false;
   }

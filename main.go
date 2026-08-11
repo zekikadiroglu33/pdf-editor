@@ -57,19 +57,26 @@ var staticAssetTypes = map[string]string{
 	"/robots.txt":  "text/plain; charset=utf-8",
 }
 
+// defaultLangMarker is the data-default-lang="latin" attribute the editor
+// and converter pages (edit-pdf.html, convert.html, pdf-to-word.html) carry
+// on <body> - app.js/convert.js read it to decide the PDF-encoding language
+// dropdown's initial value. Pages without the marker (rotate/merge/split/...
+// have no encoding dropdown at all) are unaffected by the replace-once
+// below.
+var defaultLangMarker = []byte(`data-default-lang="latin"`)
+
+// htmlLangMarker is every page's <html lang="en">. Swapping it to "tr" is
+// what tells i18n.js (see static/i18n.js) to translate the page's UI text,
+// and also makes the attribute itself honest for screen readers/SEO once
+// the visible content actually is Turkish.
+var htmlLangMarker = []byte(`<html lang="en">`)
+
 // staticHandler serves the embedded static/ tree, resolving each of
 // pageRoutes and staticAssetTypes to its file once at startup - not per
 // request, since the embedded file set never changes at runtime. Google
 // Analytics is entirely a static-asset concern (see analytics.js): every
 // page loads it unconditionally via a plain <script> tag, so nothing
 // server-side needs to know about it.
-// defaultLangMarker is the data-default-lang="latin" attribute the editor
-// and converter pages (edit-pdf.html, convert.html, pdf-to-word.html) carry
-// on <body> - app.js/convert.js read it to decide the language dropdown's
-// initial value. Pages without the marker (rotate/merge/split/... have no
-// language dropdown at all) are unaffected by the replace-once below.
-var defaultLangMarker = []byte(`data-default-lang="latin"`)
-
 func staticHandler(fsys fs.FS) http.Handler {
 	rendered := make(map[string][]byte, len(pageRoutes))
 	renderedTurkish := make(map[string][]byte, len(pageRoutes))
@@ -79,7 +86,9 @@ func staticHandler(fsys fs.FS) http.Handler {
 			log.Fatalf("static/%s: %v", file, err)
 		}
 		rendered[urlPath] = data
-		renderedTurkish[urlPath] = bytes.Replace(data, defaultLangMarker, []byte(`data-default-lang="turkish"`), 1)
+		tr := bytes.Replace(data, defaultLangMarker, []byte(`data-default-lang="turkish"`), 1)
+		tr = bytes.Replace(tr, htmlLangMarker, []byte(`<html lang="tr">`), 1)
+		renderedTurkish[urlPath] = tr
 	}
 
 	assets := make(map[string][]byte, len(staticAssetTypes))
