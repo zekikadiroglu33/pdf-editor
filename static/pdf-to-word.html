@@ -6,7 +6,7 @@
 <meta name="google-site-verification" content="ekVOYYr4KzSdzymEifBAL8Djike5fr_iFKqCm2qJEaY" />
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1493720963523532"
      crossorigin="anonymous"></script>
-<title>PDF to Word Converter Online Free — .docx | pdfer</title>
+<title data-i18n="pdfToWordPage.title">PDF to Word Converter Online Free — .docx | pdfer</title>
 <meta name="description" content="Free online PDF to Word converter. Extract a PDF's text into an editable .docx file, in your browser. No signup, no watermark, files never stored.">
 <link rel="canonical" href="/pdf-to-word">
 <meta property="og:type" content="website">
@@ -23,45 +23,45 @@
 <body data-default-lang="latin">
 <div class="app">
   <div class="topbar">
-    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — PDF to Word Converter Online Free</span></h1><span class="badge">Free</span></div>
-    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden" data-i18n="pdfToWordPage.brandHidden"> — PDF to Word Converter Online Free</span></h1><span class="badge" data-i18n="common.badgeFree">Free</span></div>
+    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme" data-i18n-aria-label="common.themeToggle">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
+  <p class="sub" data-i18n="common.tagline">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
-    <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
-    <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
-    <li><span class="privacy-icon">✓</span> Upload, edit or convert, download — that's it</li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNoAccount">No account or sign-up required</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNotStored">Your files are never stored on the server</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyUploadEditDownload">Upload, edit or convert, download — that's it</span></li>
   </ul>
 
   <nav class="nav">
-    <a href="/">🏠 Home</a>
-    <a href="/edit-pdf">✎ Edit</a>
-    <a href="/convert.html" class="active">⇄ Convert</a>
-    <a href="/tools.html">🛠 Tools</a>
+    <a href="/" data-i18n="nav.home">🏠 Home</a>
+    <a href="/edit-pdf" data-i18n="nav.edit">✎ Edit</a>
+    <a href="/convert.html" class="active" data-i18n="nav.convert">⇄ Convert</a>
+    <a href="/tools.html" data-i18n="nav.tools">🛠 Tools</a>
   </nav>
 
   <div class="layout">
     <section class="card">
-      <h2 class="card-title">PDF to Word</h2>
-      <p class="hint">Best-effort text extraction: wrapped lines are stitched back into paragraphs, but columns, tables and images are not reconstructed. Scanned/image-only PDFs have no text to convert.</p>
+      <h2 class="card-title" data-i18n="pdfToWordPage.cardTitle">PDF to Word</h2>
+      <p class="hint" data-i18n="convertWidget.convertHint">Best-effort text extraction: wrapped lines are stitched back into paragraphs, but columns, tables and images are not reconstructed. Scanned/image-only PDFs have no text to convert.</p>
 
       <div class="drop" id="convDrop">
         <span class="drop-icon">📄</span>
-        <span class="drop-text">Drop a PDF here or click to choose</span>
+        <span class="drop-text" data-i18n="common.dropPdf">Drop a PDF here or click to choose</span>
       </div>
       <input type="file" id="convFile" accept="application/pdf" hidden>
 
-      <label for="convFormat">Convert to</label>
+      <label for="convFormat" data-i18n="convertWidget.convertToLabel">Convert to</label>
       <div class="format-grid single-col" id="convFormat">
-        <button type="button" class="format-opt active" data-format="docx" data-ext=".docx" data-icon="📝">📝 Word (.docx)</button>
+        <button type="button" class="format-opt active" data-format="docx" data-ext=".docx" data-icon="📝" data-i18n="pdfToWordPage.fmtWordDocx">📝 Word (.docx)</button>
       </div>
-      <p class="hint" id="rasterHint" hidden>Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
-      <p class="hint">Need PowerPoint, Excel, HTML, plain text, or an image format instead? <a href="/convert.html">See all conversion formats →</a></p>
+      <p class="hint" id="rasterHint" hidden data-i18n="convertWidget.rasterHint">Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
+      <p class="hint" data-i18n-html="pdfToWordPage.moreFormatsHint">Need PowerPoint, Excel, HTML, plain text, or an image format instead? <a href="/convert.html">See all conversion formats →</a></p>
 
-      <label for="convLang">Language</label>
+      <label for="convLang" data-i18n="common.languageLabel">Language</label>
       <select id="convLang">
-        <option value="latin">Latin / English (default)</option>
-        <option value="turkish">Turkish</option>
+        <option value="latin" data-i18n="common.langLatin">Latin / English (default)</option>
+        <option value="turkish" data-i18n="common.langTurkish">Turkish</option>
       </select>
 
       <button id="convGo" disabled>Convert to .docx</button>
@@ -69,10 +69,10 @@
     </section>
 
     <section class="card">
-      <h2 class="card-title">Output</h2>
+      <h2 class="card-title" data-i18n="common.outputTitle">Output</h2>
       <div class="empty-preview" id="convEmptyPreview">
         <span class="icon">🗎</span>
-        <span>Your converted file will appear here.</span>
+        <span data-i18n="convertWidget.emptyResult">Your converted file will appear here.</span>
       </div>
       <div id="convResult" hidden>
         <div class="result-doc">
@@ -82,83 +82,84 @@
             <span id="convMeta"></span>
           </div>
         </div>
-        <a id="convDl" class="download-link" download="converted.docx">⬇ Download</a>
+        <a id="convDl" class="download-link" download="converted.docx" data-i18n="common.downloadGeneric">⬇ Download</a>
       </div>
     </section>
   </div>
 
   <section class="card landing-section">
-    <h2 class="card-title">What it does</h2>
-    <p>PDF to Word extracts the text from your PDF and rebuilds it as an editable Microsoft Word (.docx) file, right in your browser — no software to install.</p>
+    <h2 class="card-title" data-i18n="common.whatItDoes">What it does</h2>
+    <p data-i18n="pdfToWordPage.whatItDoes">PDF to Word extracts the text from your PDF and rebuilds it as an editable Microsoft Word (.docx) file, right in your browser — no software to install.</p>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">How it works</h2>
+    <h2 class="card-title" data-i18n="common.howItWorks">How it works</h2>
     <ol>
-      <li>Your PDF is normalized server-side, then each page's text is decoded and its actual on-page position tracked, so lines can be told apart from paragraphs.</li>
-      <li>Consecutive lines are grouped into paragraphs using the same heuristic tools like <code>pdftotext -layout</code> use: an ordinary line-wrap joins with a space, and a bigger gap (or a move back up the page) starts a new paragraph.</li>
-      <li>The resulting paragraphs are written out as minimal OOXML WordprocessingML — one <code>&lt;w:p&gt;</code> per paragraph, with an explicit page break between pages — and streamed back as a .docx file.</li>
+      <li data-i18n="pdfToWordPage.how1">Your PDF is normalized server-side, then each page's text is decoded and its actual on-page position tracked, so lines can be told apart from paragraphs.</li>
+      <li data-i18n-html="pdfToWordPage.how2">Consecutive lines are grouped into paragraphs using the same heuristic tools like <code>pdftotext -layout</code> use: an ordinary line-wrap joins with a space, and a bigger gap (or a move back up the page) starts a new paragraph.</li>
+      <li data-i18n-html="pdfToWordPage.how3">The resulting paragraphs are written out as minimal OOXML WordprocessingML — one <code>&lt;w:p&gt;</code> per paragraph, with an explicit page break between pages — and streamed back as a .docx file.</li>
     </ol>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">Benefits</h2>
+    <h2 class="card-title" data-i18n="common.benefits">Benefits</h2>
     <ul class="benefits-grid">
-      <li>Free, no account or sign-up</li>
-      <li>Opens directly in Word, Google Docs, or LibreOffice</li>
-      <li>Files never stored on the server</li>
-      <li>Optional Turkish character encoding support</li>
+      <li data-i18n="common.benefitFreeNoAccount">Free, no account or sign-up</li>
+      <li data-i18n="pdfToWordPage.benefit2">Opens directly in Word, Google Docs, or LibreOffice</li>
+      <li data-i18n="common.benefitFilesNotStored">Files never stored on the server</li>
+      <li data-i18n="pdfToWordPage.benefit4">Optional Turkish character encoding support</li>
     </ul>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">Examples</h2>
+    <h2 class="card-title" data-i18n="common.examples">Examples</h2>
     <ul class="examples-list">
-      <li>Turn a PDF report into a Word document so you can edit and reformat it.</li>
-      <li>Extract the text of an emailed PDF letter to reuse in a new document.</li>
-      <li>Convert a PDF form's instructions into Word for markup and comments.</li>
+      <li data-i18n="pdfToWordPage.example1">Turn a PDF report into a Word document so you can edit and reformat it.</li>
+      <li data-i18n="pdfToWordPage.example2">Extract the text of an emailed PDF letter to reuse in a new document.</li>
+      <li data-i18n="pdfToWordPage.example3">Convert a PDF form's instructions into Word for markup and comments.</li>
     </ul>
   </section>
 
   <section class="card landing-section faq">
-    <h2 class="card-title">FAQ</h2>
+    <h2 class="card-title" data-i18n="common.faq">FAQ</h2>
     <details>
-      <summary>Will my tables, columns, or images be preserved?</summary>
-      <p>No — this is best-effort text extraction, not layout reconstruction. Multi-column layouts and tables come out as a linear sequence of paragraphs, and images aren't carried over at all.</p>
+      <summary data-i18n="pdfToWordPage.faq1q">Will my tables, columns, or images be preserved?</summary>
+      <p data-i18n="pdfToWordPage.faq1a">No — this is best-effort text extraction, not layout reconstruction. Multi-column layouts and tables come out as a linear sequence of paragraphs, and images aren't carried over at all.</p>
     </details>
     <details>
-      <summary>Does it work on scanned PDFs?</summary>
-      <p>No — a scanned or image-only PDF has no underlying text to extract. You'd need to run OCR on it first.</p>
+      <summary data-i18n="pdfToWordPage.faq2q">Does it work on scanned PDFs?</summary>
+      <p data-i18n="pdfToWordPage.faq2a">No — a scanned or image-only PDF has no underlying text to extract. You'd need to run OCR on it first.</p>
     </details>
     <details>
-      <summary>Why is a sentence split into two paragraphs?</summary>
-      <p>Paragraphs are inferred from vertical line spacing, so unusual line spacing in the source PDF can occasionally be misread as a paragraph break.</p>
+      <summary data-i18n="pdfToWordPage.faq3q">Why is a sentence split into two paragraphs?</summary>
+      <p data-i18n="pdfToWordPage.faq3a">Paragraphs are inferred from vertical line spacing, so unusual line spacing in the source PDF can occasionally be misread as a paragraph break.</p>
     </details>
     <details>
-      <summary>Can I convert to PowerPoint, Excel, or an image instead?</summary>
-      <p>Yes — <a href="/convert.html">the full converter</a> supports pptx, xlsx, HTML, plain text, SVG, PNG, JPEG, TIFF, and WEBP too.</p>
+      <summary data-i18n="pdfToWordPage.faq4q">Can I convert to PowerPoint, Excel, or an image instead?</summary>
+      <p data-i18n-html="pdfToWordPage.faq4a">Yes — <a href="/convert.html">the full converter</a> supports pptx, xlsx, HTML, plain text, SVG, PNG, JPEG, TIFF, and WEBP too.</p>
     </details>
     <details>
-      <summary>Is my file stored anywhere?</summary>
-      <p>No, files are processed in memory only and never written to persistent storage.</p>
+      <summary data-i18n="common.faqStoredQ">Is my file stored anywhere?</summary>
+      <p data-i18n="common.faqStoredA">No, files are processed in memory only and never written to persistent storage.</p>
     </details>
   </section>
 
   <section class="card landing-section other-tools">
-    <h2 class="card-title">Other free PDF tools</h2>
+    <h2 class="card-title" data-i18n="common.otherToolsHeading">Other free PDF tools</h2>
     <div class="tool-links">
-      <a href="/edit-pdf">✎ Edit PDF</a>
-      <a href="/merge-pdf">🔗 Merge PDF</a>
-      <a href="/split-pdf">✂ Split PDF</a>
-      <a href="/compress-pdf">📦 Compress PDF</a>
-      <a href="/rotate-pdf">↻ Rotate PDF</a>
-      <a href="/tools.html">🛠 All PDF tools</a>
-      <a href="/convert.html">⇄ All conversion formats</a>
+      <a href="/edit-pdf" data-i18n="toolLink.edit">✎ Edit PDF</a>
+      <a href="/merge-pdf" data-i18n="toolLink.merge">🔗 Merge PDF</a>
+      <a href="/split-pdf" data-i18n="toolLink.split">✂ Split PDF</a>
+      <a href="/compress-pdf" data-i18n="toolLink.compress">📦 Compress PDF</a>
+      <a href="/rotate-pdf" data-i18n="toolLink.rotate">↻ Rotate PDF</a>
+      <a href="/tools.html" data-i18n="toolLink.allTools">🛠 All PDF tools</a>
+      <a href="/convert.html" data-i18n="toolLink.allConversions">⇄ All conversion formats</a>
     </div>
   </section>
 </div>
 
 <script src="theme.js"></script>
+<script src="i18n.js"></script>
 <script src="analytics.js"></script>
 <script src="convert.js"></script>
 </body>

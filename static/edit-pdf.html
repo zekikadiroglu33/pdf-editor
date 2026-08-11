@@ -6,7 +6,7 @@
 <meta name="google-site-verification" content="ekVOYYr4KzSdzymEifBAL8Djike5fr_iFKqCm2qJEaY" />
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1493720963523532"
      crossorigin="anonymous"></script>
-<title>Edit PDF Online Free — Find &amp; Replace Text | pdfer</title>
+<title data-i18n="editPage.title">Edit PDF Online Free — Find &amp; Replace Text | pdfer</title>
 <meta name="description" content="Free online PDF editor. Upload a PDF, find and replace text right in the page preview, review every change highlighted, then download — no signup, no watermark.">
 <link rel="canonical" href="/edit-pdf">
 <meta property="og:type" content="website">
@@ -23,152 +23,153 @@
 <body data-default-lang="latin">
 <div class="app">
   <div class="topbar">
-    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Edit PDF Online Free: Find &amp; Replace Text</span></h1><span class="badge">Free</span></div>
-    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden" data-i18n="editPage.brandHidden"> — Edit PDF Online Free: Find &amp; Replace Text</span></h1><span class="badge" data-i18n="common.badgeFree">Free</span></div>
+    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme" data-i18n-aria-label="common.themeToggle">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
+  <p class="sub" data-i18n="common.tagline">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
-    <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
-    <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
-    <li><span class="privacy-icon">✓</span> Upload, edit or convert, download — that's it</li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNoAccount">No account or sign-up required</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNotStored">Your files are never stored on the server</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyUploadEditDownload">Upload, edit or convert, download — that's it</span></li>
   </ul>
 
   <nav class="nav">
-    <a href="/">🏠 Home</a>
-    <a href="/edit-pdf" class="active">✎ Edit</a>
-    <a href="/convert.html">⇄ Convert</a>
-    <a href="/tools.html">🛠 Tools</a>
+    <a href="/" data-i18n="nav.home">🏠 Home</a>
+    <a href="/edit-pdf" class="active" data-i18n="nav.edit">✎ Edit</a>
+    <a href="/convert.html" data-i18n="nav.convert">⇄ Convert</a>
+    <a href="/tools.html" data-i18n="nav.tools">🛠 Tools</a>
   </nav>
 
   <div class="layout">
     <section class="card">
-      <h2 class="card-title">Edit</h2>
+      <h2 class="card-title" data-i18n="editPage.cardTitle">Edit</h2>
       <div class="drop" id="drop">
         <span class="drop-icon">📄</span>
-        <span class="drop-text">Drop a PDF here or click to choose</span>
+        <span class="drop-text" data-i18n="common.dropPdf">Drop a PDF here or click to choose</span>
       </div>
       <input type="file" id="file" accept="application/pdf" hidden>
 
-      <label for="lang">Language</label>
+      <label for="lang" data-i18n="common.languageLabel">Language</label>
       <select id="lang">
-        <option value="latin">Latin / English (default)</option>
-        <option value="turkish">Turkish</option>
+        <option value="latin" data-i18n="common.langLatin">Latin / English (default)</option>
+        <option value="turkish" data-i18n="common.langTurkish">Turkish</option>
       </select>
 
-      <label for="find">Find text</label>
-      <input type="text" id="find" placeholder="e.g. ACME Corp">
+      <label for="find" data-i18n="editPage.findLabel">Find text</label>
+      <input type="text" id="find" placeholder="e.g. ACME Corp" data-i18n-placeholder="editPage.findPlaceholder">
 
-      <label for="replace">Replace with</label>
-      <input type="text" id="replace" placeholder="e.g. Globex Inc">
+      <label for="replace" data-i18n="editPage.replaceLabel">Replace with</label>
+      <input type="text" id="replace" placeholder="e.g. Globex Inc" data-i18n-placeholder="editPage.replacePlaceholder">
 
-      <label class="checkbox-row"><input type="checkbox" id="regex"> <span>Use regex</span></label>
-      <p class="hint regex-hint">e.g. <code>Invoice (\d+)-(\d+)</code> → <code>INV-$2/$1</code></p>
+      <label class="checkbox-row"><input type="checkbox" id="regex"> <span data-i18n="editPage.useRegex">Use regex</span></label>
+      <p class="hint regex-hint" data-i18n-html="editPage.regexHint">e.g. <code>Invoice (\d+)-(\d+)</code> → <code>INV-$2/$1</code></p>
 
-      <button id="go" disabled>Edit PDF</button>
+      <button id="go" disabled data-i18n="editPage.goButton">Edit PDF</button>
       <div id="status"></div>
 
       <div class="confirm-row" id="confirmRow">
         <span id="pendingCount"></span>
-        <button type="button" id="confirmBtn">✓ Confirm changes &amp; prepare download</button>
+        <button type="button" id="confirmBtn" data-i18n="editPage.confirmButton">✓ Confirm changes &amp; prepare download</button>
       </div>
     </section>
 
     <section class="card">
-      <h2 class="card-title">Preview</h2>
-      <p class="hint" id="viewerHint" hidden>Click any text on the page below to edit it right there — type the new text and press Enter to apply it (Esc cancels). Or drag to select text instead to fill "Find text" — useful for replacing every occurrence, or with regex mode (editing "Find text" by hand switches to replacing every match instead). Zoom in for small text to select or click it precisely. Edited text is highlighted in yellow so you can review every change made this session before downloading.</p>
+      <h2 class="card-title" data-i18n="editPage.previewTitle">Preview</h2>
+      <p class="hint" id="viewerHint" hidden data-i18n="editPage.viewerHint">Click any text on the page below to edit it right there — type the new text and press Enter to apply it (Esc cancels). Or drag to select text instead to fill "Find text" — useful for replacing every occurrence, or with regex mode (editing "Find text" by hand switches to replacing every match instead). Zoom in for small text to select or click it precisely. Edited text is highlighted in yellow so you can review every change made this session before downloading.</p>
       <div class="toolbar" id="toolbar">
-        <button type="button" id="zoomOut">− Zoom out</button>
+        <button type="button" id="zoomOut" data-i18n="editPage.zoomOut">− Zoom out</button>
         <span id="zoomLevel">150%</span>
-        <button type="button" id="zoomIn">+ Zoom in</button>
-        <button type="button" id="undo" disabled>↶ Undo</button>
+        <button type="button" id="zoomIn" data-i18n="editPage.zoomIn">+ Zoom in</button>
+        <button type="button" id="undo" disabled data-i18n="editPage.undo">↶ Undo</button>
       </div>
       <div class="viewer" id="viewer"></div>
       <div class="empty-preview" id="emptyPreview">
         <span class="icon">🗎</span>
-        <span>Your PDF will render here once you drop or choose a file.</span>
+        <span data-i18n="editPage.emptyPreview">Your PDF will render here once you drop or choose a file.</span>
       </div>
     </section>
   </div>
 
   <div id="result">
-    <a id="dl" class="download-link" download="edited.pdf">⬇ Download edited.pdf</a>
+    <a id="dl" class="download-link" download="edited.pdf" data-i18n="editPage.downloadLink">⬇ Download edited.pdf</a>
     <iframe id="preview" title="Edited PDF preview"></iframe>
   </div>
 
   <section class="card landing-section">
-    <h2 class="card-title">What it does</h2>
-    <p>pdfer's editor finds and replaces text directly inside a PDF, in your browser, with no software to install. Drop in a file, either type the text to find or drag-select it right on the rendered page, type its replacement, and review every change — highlighted in yellow — before you download the edited file.</p>
+    <h2 class="card-title" data-i18n="common.whatItDoes">What it does</h2>
+    <p data-i18n="editPage.whatItDoes">pdfer's editor finds and replaces text directly inside a PDF, in your browser, with no software to install. Drop in a file, either type the text to find or drag-select it right on the rendered page, type its replacement, and review every change — highlighted in yellow — before you download the edited file.</p>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">How it works</h2>
+    <h2 class="card-title" data-i18n="common.howItWorks">How it works</h2>
     <ol>
-      <li>Your PDF is normalized into a classic, uncompressed file, so its text becomes plain, searchable bytes.</li>
-      <li>Your find/replace text is transcoded into the same single-byte encoding the PDF's font uses (Latin/WinAnsi by default, or Windows-1254 for Turkish), then matched and replaced byte-for-byte inside every text stream, with the replacement properly escaped for PDF syntax.</li>
-      <li>The file is rebuilt with a fresh cross-reference table and recompressed, so the result opens cleanly in any PDF viewer.</li>
-      <li>Nothing is written to disk on the server — the edited file is streamed straight back to your browser.</li>
+      <li data-i18n="editPage.how1">Your PDF is normalized into a classic, uncompressed file, so its text becomes plain, searchable bytes.</li>
+      <li data-i18n="editPage.how2">Your find/replace text is transcoded into the same single-byte encoding the PDF's font uses (Latin/WinAnsi by default, or Windows-1254 for Turkish), then matched and replaced byte-for-byte inside every text stream, with the replacement properly escaped for PDF syntax.</li>
+      <li data-i18n="editPage.how3">The file is rebuilt with a fresh cross-reference table and recompressed, so the result opens cleanly in any PDF viewer.</li>
+      <li data-i18n="editPage.how4">Nothing is written to disk on the server — the edited file is streamed straight back to your browser.</li>
     </ol>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">Benefits</h2>
+    <h2 class="card-title" data-i18n="common.benefits">Benefits</h2>
     <ul class="benefits-grid">
-      <li>Free, no account or sign-up required</li>
-      <li>Files are processed in memory and never stored on the server</li>
-      <li>Every change is highlighted so you can review before downloading</li>
-      <li>Undo up to 5 steps, right in your browser tab</li>
+      <li data-i18n="editPage.benefit1">Free, no account or sign-up required</li>
+      <li data-i18n="editPage.benefit2">Files are processed in memory and never stored on the server</li>
+      <li data-i18n="editPage.benefit3">Every change is highlighted so you can review before downloading</li>
+      <li data-i18n="editPage.benefit4">Undo up to 5 steps, right in your browser tab</li>
     </ul>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">Examples</h2>
+    <h2 class="card-title" data-i18n="common.examples">Examples</h2>
     <ul class="examples-list">
-      <li>Update a company name or address across every page of a contract template before sending it out.</li>
-      <li>Correct a misspelled client name on an invoice without recreating the document from scratch.</li>
-      <li>Swap a recurring value throughout a document in one pass using regex mode — e.g. <code>Invoice (\d+)-(\d+)</code> → <code>INV-$2/$1</code>.</li>
+      <li data-i18n="editPage.example1">Update a company name or address across every page of a contract template before sending it out.</li>
+      <li data-i18n="editPage.example2">Correct a misspelled client name on an invoice without recreating the document from scratch.</li>
+      <li data-i18n-html="editPage.example3">Swap a recurring value throughout a document in one pass using regex mode — e.g. <code>Invoice (\d+)-(\d+)</code> → <code>INV-$2/$1</code>.</li>
     </ul>
   </section>
 
   <section class="card landing-section faq">
-    <h2 class="card-title">FAQ</h2>
+    <h2 class="card-title" data-i18n="common.faq">FAQ</h2>
     <details>
-      <summary>Does this work on scanned PDFs?</summary>
-      <p>No — a scanned or image-only PDF has no underlying text layer, so there's nothing to find or replace. You'd need to run OCR on it first.</p>
+      <summary data-i18n="editPage.faq1q">Does this work on scanned PDFs?</summary>
+      <p data-i18n="editPage.faq1a">No — a scanned or image-only PDF has no underlying text layer, so there's nothing to find or replace. You'd need to run OCR on it first.</p>
     </details>
     <details>
-      <summary>Will replacing text change the page layout?</summary>
-      <p>Replacement text keeps the original glyph positions, so a much longer replacement can overlap neighboring text. Short, similar-length replacements work best.</p>
+      <summary data-i18n="editPage.faq2q">Will replacing text change the page layout?</summary>
+      <p data-i18n="editPage.faq2a">Replacement text keeps the original glyph positions, so a much longer replacement can overlap neighboring text. Short, similar-length replacements work best.</p>
     </details>
     <details>
-      <summary>Is my file stored anywhere?</summary>
-      <p>No. Your PDF is processed in memory for the duration of the request only and is never written to persistent storage.</p>
+      <summary data-i18n="editPage.faq3q">Is my file stored anywhere?</summary>
+      <p data-i18n="editPage.faq3a">No. Your PDF is processed in memory for the duration of the request only and is never written to persistent storage.</p>
     </details>
     <details>
-      <summary>Why didn't my search text match?</summary>
-      <p>If a phrase is kerned into separate pieces by the original PDF (e.g. "AC" then "ME" as two operators), a search for "ACME" won't match — this depends on how the source document laid out its text, not on your search.</p>
+      <summary data-i18n="editPage.faq4q">Why didn't my search text match?</summary>
+      <p data-i18n="editPage.faq4a">If a phrase is kerned into separate pieces by the original PDF (e.g. "AC" then "ME" as two operators), a search for "ACME" won't match — this depends on how the source document laid out its text, not on your search.</p>
     </details>
     <details>
-      <summary>Can I undo a change?</summary>
-      <p>Yes, up to the last 5 edits — but undo is held in your browser tab's memory only, so reload or closing the tab clears it. Download before you navigate away.</p>
+      <summary data-i18n="editPage.faq5q">Can I undo a change?</summary>
+      <p data-i18n="editPage.faq5a">Yes, up to the last 5 edits — but undo is held in your browser tab's memory only, so reload or closing the tab clears it. Download before you navigate away.</p>
     </details>
   </section>
 
   <section class="card landing-section other-tools">
-    <h2 class="card-title">Other free PDF tools</h2>
+    <h2 class="card-title" data-i18n="common.otherToolsHeading">Other free PDF tools</h2>
     <div class="tool-links">
-      <a href="/merge-pdf">🔗 Merge PDF</a>
-      <a href="/split-pdf">✂ Split PDF</a>
-      <a href="/compress-pdf">📦 Compress PDF</a>
-      <a href="/rotate-pdf">↻ Rotate PDF</a>
-      <a href="/pdf-to-word">📝 PDF to Word</a>
-      <a href="/tools.html">🛠 All PDF tools</a>
-      <a href="/convert.html">⇄ All conversion formats</a>
+      <a href="/merge-pdf" data-i18n="toolLink.merge">🔗 Merge PDF</a>
+      <a href="/split-pdf" data-i18n="toolLink.split">✂ Split PDF</a>
+      <a href="/compress-pdf" data-i18n="toolLink.compress">📦 Compress PDF</a>
+      <a href="/rotate-pdf" data-i18n="toolLink.rotate">↻ Rotate PDF</a>
+      <a href="/pdf-to-word" data-i18n="toolLink.pdfToWord">📝 PDF to Word</a>
+      <a href="/tools.html" data-i18n="toolLink.allTools">🛠 All PDF tools</a>
+      <a href="/convert.html" data-i18n="toolLink.allConversions">⇄ All conversion formats</a>
     </div>
   </section>
 </div>
 
 <script src="vendor/pdf.min.js"></script>
 <script src="theme.js"></script>
+<script src="i18n.js"></script>
 <script src="analytics.js"></script>
 <script src="app.js"></script>
 </body>

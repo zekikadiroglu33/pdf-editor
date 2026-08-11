@@ -48,17 +48,17 @@ const toolResultName = document.getElementById('toolResultName');
 const toolMeta = document.getElementById('toolMeta');
 const toolDl = document.getElementById('toolDl');
 
-const TOOL_LABELS = {
-  rotate: 'Rotate PDF',
-  merge: 'Merge PDFs',
-  split: 'Split PDF',
-  delete: 'Delete pages',
-  compress: 'Compress PDF',
-  watermark: 'Add watermark',
-  crop: 'Crop PDF',
-  addimage: 'Add image',
-  compressimages: 'Compress images',
-};
+const TOOL_LABELS = () => ({
+  rotate: pdferT('tools.toolRotate', 'Rotate PDF'),
+  merge: pdferT('tools.toolMerge', 'Merge PDFs'),
+  split: pdferT('tools.toolSplit', 'Split PDF'),
+  delete: pdferT('tools.toolDelete', 'Delete pages'),
+  compress: pdferT('tools.toolCompress', 'Compress PDF'),
+  watermark: pdferT('tools.toolWatermark', 'Add watermark'),
+  crop: pdferT('tools.toolCrop', 'Crop PDF'),
+  addimage: pdferT('tools.toolAddImage', 'Add image'),
+  compressimages: pdferT('tools.toolCompressImages', 'Compress images'),
+});
 
 let currentTool = 'rotate';
 let toolFile = null;
@@ -66,6 +66,7 @@ let mergeFiles = [];
 let addImageFile = null;
 
 const setToolStatus = (msg, cls = '') => { toolStatus.textContent = msg; toolStatus.className = cls; };
+const errorMsg = err => pdferT('common.errorPrefix', 'Error: ') + err.message;
 
 function hideToolResult() {
   toolResult.style.display = 'none';
@@ -85,7 +86,7 @@ function updateToolGoState() {
 function selectTool(tool) {
   currentTool = tool;
   toolOpts.forEach(o => o.classList.toggle('active', o.dataset.tool === tool));
-  toolGo.textContent = TOOL_LABELS[tool];
+  toolGo.textContent = TOOL_LABELS()[tool];
 
   const isMerge = tool === 'merge';
   toolDrop.hidden = isMerge;
@@ -115,7 +116,7 @@ if (window.PDFER_LOCK_TOOL) selectTool(window.PDFER_LOCK_TOOL);
 // Single-file drop, shared by rotate/split/delete/compress (only one of
 // which is visible at a time - see selectTool above).
 const setToolFile = f => {
-  if (!f || f.type !== 'application/pdf') { setToolStatus('Please choose a PDF file.', 'err'); return; }
+  if (!f || f.type !== 'application/pdf') { setToolStatus(pdferT('common.pleaseChoosePdf', 'Please choose a PDF file.'), 'err'); return; }
   toolFile = f;
   hideToolResult();
   setToolStatus('');
@@ -144,7 +145,7 @@ toolDrop.addEventListener('drop', e => {
 // Multi-file drop, merge only.
 const setMergeFiles = fileList => {
   const files = Array.from(fileList).filter(f => f.type === 'application/pdf');
-  if (files.length === 0) { setToolStatus('Please choose PDF files.', 'err'); return; }
+  if (files.length === 0) { setToolStatus(pdferT('tools.pleaseChoosePdfs', 'Please choose PDF files.'), 'err'); return; }
   mergeFiles = files;
   hideToolResult();
   setToolStatus('');
@@ -155,11 +156,11 @@ const setMergeFiles = fileList => {
   icon.textContent = '📄';
   const text = document.createElement('span');
   text.className = 'drop-text';
-  text.textContent = `${files.length} file(s) selected`;
+  text.textContent = pdferT('tools.filesSelected', '{n} file(s) selected', { n: files.length });
   mergeDrop.append(icon, text);
   mergeDrop.classList.add('hasfile');
   mergeFileList.textContent = files.length < 2
-    ? 'Select at least 2 files to merge.'
+    ? pdferT('tools.selectAtLeast2', 'Select at least 2 files to merge.')
     : files.map(f => f.name).join(', ');
 
   updateToolGoState();
@@ -178,7 +179,7 @@ mergeDrop.addEventListener('drop', e => {
 // needs two files at once).
 const setAddImageFile = f => {
   if (!f || (f.type !== 'image/jpeg' && f.type !== 'image/png')) {
-    setToolStatus('Please choose a JPEG or PNG image.', 'err');
+    setToolStatus(pdferT('tools.pleaseChooseImage', 'Please choose a JPEG or PNG image.'), 'err');
     return;
   }
   addImageFile = f;
@@ -223,14 +224,14 @@ toolGo.addEventListener('click', async () => {
       if (splitRanges.value.trim()) form.append('ranges', splitRanges.value.trim());
       url = '/api/split';
     } else if (currentTool === 'delete') {
-      if (!deletePages.value.trim()) { setToolStatus('Enter at least one page to delete.', 'err'); return; }
+      if (!deletePages.value.trim()) { setToolStatus(pdferT('tools.enterPageToDelete', 'Enter at least one page to delete.'), 'err'); return; }
       form.append('pages', deletePages.value.trim());
       url = '/api/delete-pages';
     } else if (currentTool === 'compress') {
       if (compressQuality.value.trim()) form.append('quality', compressQuality.value.trim());
       url = '/api/compress';
     } else if (currentTool === 'watermark') {
-      if (!watermarkText.value.trim()) { setToolStatus('Enter the watermark text.', 'err'); return; }
+      if (!watermarkText.value.trim()) { setToolStatus(pdferT('tools.enterWatermarkText', 'Enter the watermark text.'), 'err'); return; }
       form.append('text', watermarkText.value.trim());
       if (watermarkOpacity.value.trim()) form.append('opacity', watermarkOpacity.value.trim());
       if (watermarkFontSize.value.trim()) form.append('fontSize', watermarkFontSize.value.trim());
@@ -258,7 +259,7 @@ toolGo.addEventListener('click', async () => {
 
   toolGo.disabled = true;
   hideToolResult();
-  setToolStatus('Processing…');
+  setToolStatus(pdferT('tools.processing', 'Processing…'));
 
   try {
     const res = await fetch(url, { method: 'POST', body: form });
@@ -281,22 +282,22 @@ toolGo.addEventListener('click', async () => {
     toolResultName.textContent = filename;
 
     if (parts) {
-      toolMeta.textContent = `${parts} file(s), zipped`;
+      toolMeta.textContent = pdferT('tools.partsZipped', '{parts} file(s), zipped', { parts });
     } else if (origSize && compSize) {
       const pct = Math.round((1 - compSize / origSize) * 100);
       let meta = `${(origSize / 1024).toFixed(1)} KB → ${(compSize / 1024).toFixed(1)} KB`
-        + (pct > 0 ? ` (${pct}% smaller)` : '');
-      if (imagesChanged) meta = `${imagesChanged} image(s) resized, ` + meta;
+        + (pct > 0 ? pdferT('tools.smaller', ' ({pct}% smaller)', { pct }) : '');
+      if (imagesChanged) meta = pdferT('tools.imagesResizedPrefix', '{n} image(s) resized, ', { n: imagesChanged }) + meta;
       toolMeta.textContent = meta;
     } else {
-      toolMeta.textContent = 'Ready to download';
+      toolMeta.textContent = pdferT('tools.readyToDownload', 'Ready to download');
     }
 
     toolEmptyPreview.style.display = 'none';
     toolResult.style.display = 'block';
-    setToolStatus(`Done — ${filename} is ready.`, 'ok');
+    setToolStatus(pdferT('tools.doneFileReady', 'Done — {filename} is ready.', { filename }), 'ok');
   } catch (err) {
-    setToolStatus('Error: ' + err.message, 'err');
+    setToolStatus(errorMsg(err), 'err');
   } finally {
     updateToolGoState();
   }

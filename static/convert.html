@@ -6,7 +6,7 @@
 <meta name="google-site-verification" content="ekVOYYr4KzSdzymEifBAL8Djike5fr_iFKqCm2qJEaY" />
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1493720963523532"
      crossorigin="anonymous"></script>
-<title>pdfer — Free PDF Converter</title>
+<title data-i18n="convertPage.title">pdfer — Free PDF Converter</title>
 <meta name="description" content="Free online PDF converter. Convert PDF to Word, PowerPoint, Excel, HTML, plain text, or images (PNG, JPEG, TIFF, WEBP, SVG) — no signup, no watermark.">
 <link rel="canonical" href="/convert.html">
 <meta property="og:type" content="website">
@@ -26,53 +26,53 @@
 <body data-default-lang="latin">
 <div class="app">
   <div class="topbar">
-    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Free PDF Converter</span></h1><span class="badge">Free</span></div>
-    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden" data-i18n="convertPage.brandHidden"> — Free PDF Converter</span></h1><span class="badge" data-i18n="common.badgeFree">Free</span></div>
+    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme" data-i18n-aria-label="common.themeToggle">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
+  <p class="sub" data-i18n="common.tagline">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
-    <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
-    <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
-    <li><span class="privacy-icon">✓</span> Upload, edit or convert, download — that's it</li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNoAccount">No account or sign-up required</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNotStored">Your files are never stored on the server</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyUploadEditDownload">Upload, edit or convert, download — that's it</span></li>
   </ul>
 
   <nav class="nav">
-    <a href="/">🏠 Home</a>
-    <a href="/edit-pdf">✎ Edit</a>
-    <a href="/convert.html" class="active">⇄ Convert</a>
-    <a href="/tools.html">🛠 Tools</a>
+    <a href="/" data-i18n="nav.home">🏠 Home</a>
+    <a href="/edit-pdf" data-i18n="nav.edit">✎ Edit</a>
+    <a href="/convert.html" class="active" data-i18n="nav.convert">⇄ Convert</a>
+    <a href="/tools.html" data-i18n="nav.tools">🛠 Tools</a>
   </nav>
 
   <div class="layout">
     <section class="card">
-      <h2 class="card-title">Convert</h2>
-      <p class="hint">Best-effort text extraction: wrapped lines are stitched back into paragraphs, but columns, tables and images are not reconstructed. Scanned/image-only PDFs have no text to convert.</p>
+      <h2 class="card-title" data-i18n="convertWidget.cardTitle">Convert</h2>
+      <p class="hint" data-i18n="convertWidget.convertHint">Best-effort text extraction: wrapped lines are stitched back into paragraphs, but columns, tables and images are not reconstructed. Scanned/image-only PDFs have no text to convert.</p>
 
       <div class="drop" id="convDrop">
         <span class="drop-icon">📄</span>
-        <span class="drop-text">Drop a PDF here or click to choose</span>
+        <span class="drop-text" data-i18n="common.dropPdf">Drop a PDF here or click to choose</span>
       </div>
       <input type="file" id="convFile" accept="application/pdf" hidden>
 
-      <label for="convFormat">Convert to</label>
+      <label for="convFormat" data-i18n="convertWidget.convertToLabel">Convert to</label>
       <div class="format-grid" id="convFormat">
-        <button type="button" class="format-opt active" data-format="docx" data-ext=".docx" data-icon="📝">Word</button>
-        <button type="button" class="format-opt" data-format="pptx" data-ext=".pptx" data-icon="📽">PowerPoint</button>
-        <button type="button" class="format-opt" data-format="xlsx" data-ext=".xlsx" data-icon="📊">Excel</button>
-        <button type="button" class="format-opt" data-format="html" data-ext=".html" data-icon="🌐">HTML</button>
-        <button type="button" class="format-opt" data-format="txt" data-ext=".txt" data-icon="📄">Plain text</button>
-        <button type="button" class="format-opt" data-format="svg" data-ext=".svg" data-icon="🖼">SVG</button>
-        <button type="button" class="format-opt" data-format="png" data-ext=".png" data-icon="🖼">PNG</button>
-        <button type="button" class="format-opt" data-format="jpeg" data-ext=".jpg" data-icon="🖼">JPEG</button>
-        <button type="button" class="format-opt" data-format="tiff" data-ext=".tif" data-icon="🖼">TIFF</button>
-        <button type="button" class="format-opt" data-format="webp" data-ext=".webp" data-icon="🖼">WEBP</button>
+        <button type="button" class="format-opt active" data-format="docx" data-ext=".docx" data-icon="📝" data-i18n="convertWidget.fmtWord">Word</button>
+        <button type="button" class="format-opt" data-format="pptx" data-ext=".pptx" data-icon="📽" data-i18n="convertWidget.fmtPowerPoint">PowerPoint</button>
+        <button type="button" class="format-opt" data-format="xlsx" data-ext=".xlsx" data-icon="📊" data-i18n="convertWidget.fmtExcel">Excel</button>
+        <button type="button" class="format-opt" data-format="html" data-ext=".html" data-icon="🌐" data-i18n="convertWidget.fmtHtml">HTML</button>
+        <button type="button" class="format-opt" data-format="txt" data-ext=".txt" data-icon="📄" data-i18n="convertWidget.fmtPlainText">Plain text</button>
+        <button type="button" class="format-opt" data-format="svg" data-ext=".svg" data-icon="🖼" data-i18n="convertWidget.fmtSvg">SVG</button>
+        <button type="button" class="format-opt" data-format="png" data-ext=".png" data-icon="🖼" data-i18n="convertWidget.fmtPng">PNG</button>
+        <button type="button" class="format-opt" data-format="jpeg" data-ext=".jpg" data-icon="🖼" data-i18n="convertWidget.fmtJpeg">JPEG</button>
+        <button type="button" class="format-opt" data-format="tiff" data-ext=".tif" data-icon="🖼" data-i18n="convertWidget.fmtTiff">TIFF</button>
+        <button type="button" class="format-opt" data-format="webp" data-ext=".webp" data-icon="🖼" data-i18n="convertWidget.fmtWebp">WEBP</button>
       </div>
-      <p class="hint" id="rasterHint" hidden>Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
+      <p class="hint" id="rasterHint" hidden data-i18n="convertWidget.rasterHint">Image formats render each page as a picture (not extracted text). A multi-page PDF downloads as a .zip of one image per page instead of a single file.</p>
 
-      <label for="convLang">Language</label>
+      <label for="convLang" data-i18n="common.languageLabel">Language</label>
       <select id="convLang">
-        <option value="latin">Latin / English (default)</option>
-        <option value="turkish">Turkish</option>
+        <option value="latin" data-i18n="common.langLatin">Latin / English (default)</option>
+        <option value="turkish" data-i18n="common.langTurkish">Turkish</option>
       </select>
 
       <button id="convGo" disabled>Convert to .docx</button>
@@ -80,10 +80,10 @@
     </section>
 
     <section class="card">
-      <h2 class="card-title">Output</h2>
+      <h2 class="card-title" data-i18n="common.outputTitle">Output</h2>
       <div class="empty-preview" id="convEmptyPreview">
         <span class="icon">🗎</span>
-        <span>Your converted file will appear here.</span>
+        <span data-i18n="convertWidget.emptyResult">Your converted file will appear here.</span>
       </div>
       <div id="convResult" hidden>
         <div class="result-doc">
@@ -93,13 +93,14 @@
             <span id="convMeta"></span>
           </div>
         </div>
-        <a id="convDl" class="download-link" download="converted.docx">⬇ Download</a>
+        <a id="convDl" class="download-link" download="converted.docx" data-i18n="common.downloadGeneric">⬇ Download</a>
       </div>
     </section>
   </div>
 </div>
 
 <script src="theme.js"></script>
+<script src="i18n.js"></script>
 <script src="analytics.js"></script>
 <script src="convert.js"></script>
 </body>

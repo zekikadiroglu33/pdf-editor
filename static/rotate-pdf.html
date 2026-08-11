@@ -6,7 +6,7 @@
 <meta name="google-site-verification" content="ekVOYYr4KzSdzymEifBAL8Djike5fr_iFKqCm2qJEaY" />
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1493720963523532"
      crossorigin="anonymous"></script>
-<title>Rotate PDF Online Free — Fix Page Orientation | pdfer</title>
+<title data-i18n="rotatePage.title">Rotate PDF Online Free — Fix Page Orientation | pdfer</title>
 <meta name="description" content="Free online tool to rotate PDF pages 90°, 180°, or 270° — all pages or specific ones. No signup, no watermark, files never stored.">
 <link rel="canonical" href="/rotate-pdf">
 <meta property="og:type" content="website">
@@ -23,124 +23,124 @@
 <body>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden"> — Rotate PDF Online Free</span></h1><span class="badge">Free</span></div>
-    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme">🌙</button>
+    <div class="brand"><img src="logo.svg" class="brand-icon" alt=""><h1><span class="pdf">pdf</span><span class="er">er</span><span class="visually-hidden" data-i18n="rotatePage.brandHidden"> — Rotate PDF Online Free</span></h1><span class="badge" data-i18n="common.badgeFree">Free</span></div>
+    <button type="button" class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle color theme" data-i18n-aria-label="common.themeToggle">🌙</button>
   </div>
-  <p class="sub">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
+  <p class="sub" data-i18n="common.tagline">Free PDF editor and converter — upload a PDF, edit its text or convert it to another format, reviewed and confirmed before anything downloads.</p>
   <ul class="privacy-strip">
-    <li><span class="privacy-icon">✓</span> No account or sign-up required</li>
-    <li><span class="privacy-icon">✓</span> Your files are never stored on the server</li>
-    <li><span class="privacy-icon">✓</span> Upload, edit or convert, download — that's it</li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNoAccount">No account or sign-up required</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyNotStored">Your files are never stored on the server</span></li>
+    <li><span class="privacy-icon">✓</span> <span data-i18n="common.privacyUploadEditDownload">Upload, edit or convert, download — that's it</span></li>
   </ul>
 
   <nav class="nav">
-    <a href="/">🏠 Home</a>
-    <a href="/edit-pdf">✎ Edit</a>
-    <a href="/convert.html">⇄ Convert</a>
-    <a href="/tools.html" class="active">🛠 Tools</a>
+    <a href="/" data-i18n="nav.home">🏠 Home</a>
+    <a href="/edit-pdf" data-i18n="nav.edit">✎ Edit</a>
+    <a href="/convert.html" data-i18n="nav.convert">⇄ Convert</a>
+    <a href="/tools.html" class="active" data-i18n="nav.tools">🛠 Tools</a>
   </nav>
 
   <div class="layout">
     <section class="card">
-      <h2 class="card-title">Rotate PDF</h2>
+      <h2 class="card-title" data-i18n="rotatePage.cardTitle">Rotate PDF</h2>
       <div class="format-grid" id="toolPicker" hidden>
-        <button type="button" class="format-opt active" data-tool="rotate">↻ Rotate</button>
-        <button type="button" class="format-opt" data-tool="merge">🔗 Merge</button>
-        <button type="button" class="format-opt" data-tool="split">✂ Split</button>
-        <button type="button" class="format-opt" data-tool="delete">🗑 Delete pages</button>
-        <button type="button" class="format-opt" data-tool="compress">📦 Compress</button>
-        <button type="button" class="format-opt" data-tool="watermark">💧 Watermark</button>
-        <button type="button" class="format-opt" data-tool="crop">⛶ Crop</button>
-        <button type="button" class="format-opt" data-tool="addimage">🖼 Add image</button>
-        <button type="button" class="format-opt" data-tool="compressimages">🗜 Compress images</button>
+        <button type="button" class="format-opt active" data-tool="rotate" data-i18n="toolsWidget.toolRotate">↻ Rotate</button>
+        <button type="button" class="format-opt" data-tool="merge" data-i18n="toolsWidget.toolMerge">🔗 Merge</button>
+        <button type="button" class="format-opt" data-tool="split" data-i18n="toolsWidget.toolSplit">✂ Split</button>
+        <button type="button" class="format-opt" data-tool="delete" data-i18n="toolsWidget.toolDelete">🗑 Delete pages</button>
+        <button type="button" class="format-opt" data-tool="compress" data-i18n="toolsWidget.toolCompress">📦 Compress</button>
+        <button type="button" class="format-opt" data-tool="watermark" data-i18n="toolsWidget.toolWatermark">💧 Watermark</button>
+        <button type="button" class="format-opt" data-tool="crop" data-i18n="toolsWidget.toolCrop">⛶ Crop</button>
+        <button type="button" class="format-opt" data-tool="addimage" data-i18n="toolsWidget.toolAddImage">🖼 Add image</button>
+        <button type="button" class="format-opt" data-tool="compressimages" data-i18n="toolsWidget.toolCompressImages">🗜 Compress images</button>
       </div>
 
       <div class="drop" id="toolDrop">
         <span class="drop-icon">📄</span>
-        <span class="drop-text">Drop a PDF here or click to choose</span>
+        <span class="drop-text" data-i18n="common.dropPdf">Drop a PDF here or click to choose</span>
       </div>
       <input type="file" id="toolFile" accept="application/pdf" hidden>
 
       <div class="drop" id="mergeDrop" hidden>
         <span class="drop-icon">📄</span>
-        <span class="drop-text">Drop 2 or more PDFs here or click to choose</span>
+        <span class="drop-text" data-i18n="toolsWidget.dropMulti">Drop 2 or more PDFs here or click to choose</span>
       </div>
       <input type="file" id="mergeFiles" accept="application/pdf" multiple hidden>
       <p class="hint" id="mergeFileList"></p>
 
       <div id="addImageWrap" hidden>
-        <label for="addImageFile">Image to add (JPEG or PNG)</label>
+        <label for="addImageFile" data-i18n="toolsWidget.addImageLabel">Image to add (JPEG or PNG)</label>
         <div class="drop" id="addImageDrop">
           <span class="drop-icon">🖼</span>
-          <span class="drop-text">Drop a JPEG or PNG here or click to choose</span>
+          <span class="drop-text" data-i18n="toolsWidget.dropImage">Drop a JPEG or PNG here or click to choose</span>
         </div>
         <input type="file" id="addImageFile" accept="image/jpeg,image/png" hidden>
       </div>
 
       <div id="rotateOpts">
-        <label for="rotateAngle">Rotate</label>
+        <label for="rotateAngle" data-i18n="toolsWidget.rotateLabel">Rotate</label>
         <select id="rotateAngle">
-          <option value="90">90° clockwise</option>
-          <option value="-90">90° counterclockwise</option>
-          <option value="180">180°</option>
+          <option value="90" data-i18n="toolsWidget.rotate90">90° clockwise</option>
+          <option value="-90" data-i18n="toolsWidget.rotateMinus90">90° counterclockwise</option>
+          <option value="180" data-i18n="toolsWidget.rotate180">180°</option>
         </select>
-        <label for="rotatePages">Pages</label>
-        <input type="text" id="rotatePages" placeholder="e.g. 1,3,5-7 (blank = all pages)">
+        <label for="rotatePages" data-i18n="toolsWidget.pagesLabel">Pages</label>
+        <input type="text" id="rotatePages" placeholder="e.g. 1,3,5-7 (blank = all pages)" data-i18n-placeholder="toolsWidget.pagesPlaceholder">
       </div>
       <div id="splitOpts" hidden>
-        <label for="splitRanges">Ranges</label>
-        <input type="text" id="splitRanges" placeholder="e.g. 1-3;4-6 (blank = split every page)">
+        <label for="splitRanges" data-i18n="toolsWidget.rangesLabel">Ranges</label>
+        <input type="text" id="splitRanges" placeholder="e.g. 1-3;4-6 (blank = split every page)" data-i18n-placeholder="toolsWidget.rangesPlaceholder">
       </div>
       <div id="deleteOpts" hidden>
-        <label for="deletePages">Pages to delete</label>
-        <input type="text" id="deletePages" placeholder="e.g. 2,4-5">
+        <label for="deletePages" data-i18n="toolsWidget.deletePagesLabel">Pages to delete</label>
+        <input type="text" id="deletePages" placeholder="e.g. 2,4-5" data-i18n-placeholder="toolsWidget.deletePagesPlaceholder">
       </div>
       <div id="compressOpts" hidden>
-        <label for="compressQuality">JPEG quality, 1–100</label>
-        <input type="text" id="compressQuality" placeholder="blank = default quality">
+        <label for="compressQuality" data-i18n="toolsWidget.qualityLabel">JPEG quality, 1–100</label>
+        <input type="text" id="compressQuality" placeholder="blank = default quality" data-i18n-placeholder="toolsWidget.qualityPlaceholder">
       </div>
       <div id="watermarkOpts" hidden>
-        <label for="watermarkText">Watermark text</label>
-        <input type="text" id="watermarkText" placeholder="e.g. CONFIDENTIAL">
-        <label for="watermarkOpacity">Opacity, 0–1</label>
+        <label for="watermarkText" data-i18n="toolsWidget.watermarkTextLabel">Watermark text</label>
+        <input type="text" id="watermarkText" placeholder="e.g. CONFIDENTIAL" data-i18n-placeholder="toolsWidget.watermarkTextPlaceholder">
+        <label for="watermarkOpacity" data-i18n="toolsWidget.opacityLabel">Opacity, 0–1</label>
         <input type="text" id="watermarkOpacity" placeholder="0.3">
-        <label for="watermarkFontSize">Font size (pt)</label>
+        <label for="watermarkFontSize" data-i18n="toolsWidget.fontSizeLabel">Font size (pt)</label>
         <input type="text" id="watermarkFontSize" placeholder="48">
-        <label for="watermarkPages">Pages</label>
-        <input type="text" id="watermarkPages" placeholder="e.g. 1,3,5-7 (blank = all pages)">
+        <label for="watermarkPages" data-i18n="toolsWidget.pagesLabel">Pages</label>
+        <input type="text" id="watermarkPages" placeholder="e.g. 1,3,5-7 (blank = all pages)" data-i18n-placeholder="toolsWidget.pagesPlaceholder">
       </div>
       <div id="cropOpts" hidden>
-        <p class="hint">Trim each side by a percentage of the page's own width/height.</p>
-        <label for="cropLeft">Left %</label>
+        <p class="hint" data-i18n="toolsWidget.cropHint">Trim each side by a percentage of the page's own width/height.</p>
+        <label for="cropLeft" data-i18n="toolsWidget.leftPct">Left %</label>
         <input type="text" id="cropLeft" placeholder="0">
-        <label for="cropRight">Right %</label>
+        <label for="cropRight" data-i18n="toolsWidget.rightPct">Right %</label>
         <input type="text" id="cropRight" placeholder="0">
-        <label for="cropTop">Top %</label>
+        <label for="cropTop" data-i18n="toolsWidget.topPct">Top %</label>
         <input type="text" id="cropTop" placeholder="0">
-        <label for="cropBottom">Bottom %</label>
+        <label for="cropBottom" data-i18n="toolsWidget.bottomPct">Bottom %</label>
         <input type="text" id="cropBottom" placeholder="0">
-        <label for="cropPages">Pages</label>
-        <input type="text" id="cropPages" placeholder="e.g. 1,3,5-7 (blank = all pages)">
+        <label for="cropPages" data-i18n="toolsWidget.pagesLabel">Pages</label>
+        <input type="text" id="cropPages" placeholder="e.g. 1,3,5-7 (blank = all pages)" data-i18n-placeholder="toolsWidget.pagesPlaceholder">
       </div>
       <div id="addImageOpts" hidden>
-        <label for="addImageWidth">Width, % of page</label>
+        <label for="addImageWidth" data-i18n="toolsWidget.widthPctLabel">Width, % of page</label>
         <input type="text" id="addImageWidth" placeholder="40">
-        <label for="addImagePosition">Position</label>
+        <label for="addImagePosition" data-i18n="toolsWidget.positionLabel">Position</label>
         <select id="addImagePosition">
-          <option value="center">Center</option>
-          <option value="top-left">Top left</option>
-          <option value="top-right">Top right</option>
-          <option value="bottom-left">Bottom left</option>
-          <option value="bottom-right">Bottom right</option>
+          <option value="center" data-i18n="toolsWidget.posCenter">Center</option>
+          <option value="top-left" data-i18n="toolsWidget.posTopLeft">Top left</option>
+          <option value="top-right" data-i18n="toolsWidget.posTopRight">Top right</option>
+          <option value="bottom-left" data-i18n="toolsWidget.posBottomLeft">Bottom left</option>
+          <option value="bottom-right" data-i18n="toolsWidget.posBottomRight">Bottom right</option>
         </select>
-        <label for="addImagePages">Pages</label>
-        <input type="text" id="addImagePages" placeholder="e.g. 1,3,5-7 (blank = page 1 only)">
+        <label for="addImagePages" data-i18n="toolsWidget.pagesLabel">Pages</label>
+        <input type="text" id="addImagePages" placeholder="e.g. 1,3,5-7 (blank = page 1 only)" data-i18n-placeholder="toolsWidget.pagesBlankPage1">
       </div>
       <div id="compressImagesOpts" hidden>
-        <p class="hint">Downsamples images larger than this, then re-encodes them as JPEG - a resolution-aware complement to "Compress" above, which can re-encode images but not shrink their pixel dimensions.</p>
-        <label for="compressImagesMaxDim">Max dimension, px</label>
+        <p class="hint" data-i18n="toolsWidget.compressImagesHint">Downsamples images larger than this, then re-encodes them as JPEG - a resolution-aware complement to "Compress" above, which can re-encode images but not shrink their pixel dimensions.</p>
+        <label for="compressImagesMaxDim" data-i18n="toolsWidget.maxDimLabel">Max dimension, px</label>
         <input type="text" id="compressImagesMaxDim" placeholder="1600">
-        <label for="compressImagesQuality">JPEG quality, 1–100</label>
+        <label for="compressImagesQuality" data-i18n="toolsWidget.qualityLabel">JPEG quality, 1–100</label>
         <input type="text" id="compressImagesQuality" placeholder="75">
       </div>
 
@@ -149,10 +149,10 @@
     </section>
 
     <section class="card">
-      <h2 class="card-title">Output</h2>
+      <h2 class="card-title" data-i18n="common.outputTitle">Output</h2>
       <div class="empty-preview" id="toolEmptyPreview">
         <span class="icon">🗎</span>
-        <span>Your processed file will appear here.</span>
+        <span data-i18n="toolsWidget.emptyResult">Your processed file will appear here.</span>
       </div>
       <div id="toolResult" hidden>
         <div class="result-doc">
@@ -162,84 +162,85 @@
             <span id="toolMeta"></span>
           </div>
         </div>
-        <a id="toolDl" class="download-link" download="result.pdf">⬇ Download</a>
+        <a id="toolDl" class="download-link" download="result.pdf" data-i18n="common.downloadGeneric">⬇ Download</a>
       </div>
     </section>
   </div>
 
   <section class="card landing-section">
-    <h2 class="card-title">What it does</h2>
-    <p>Rotate PDF fixes sideways or upside-down pages — rotate the whole document or just the pages you specify, 90° clockwise, 90° counterclockwise, or 180°.</p>
+    <h2 class="card-title" data-i18n="common.whatItDoes">What it does</h2>
+    <p data-i18n="rotatePage.whatItDoes">Rotate PDF fixes sideways or upside-down pages — rotate the whole document or just the pages you specify, 90° clockwise, 90° counterclockwise, or 180°.</p>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">How it works</h2>
+    <h2 class="card-title" data-i18n="common.howItWorks">How it works</h2>
     <ol>
-      <li>Choose a rotation angle and, optionally, which pages to rotate (e.g. <code>1,3,5-7</code>) — leave pages blank to rotate the whole document.</li>
-      <li>Your request is applied as an explicit relative rotation on the server — the same reliable approach standard PDF processing tools use.</li>
-      <li>The rotated PDF is streamed back to your browser; page content itself is untouched, only each page's orientation flag changes.</li>
+      <li data-i18n-html="rotatePage.how1">Choose a rotation angle and, optionally, which pages to rotate (e.g. <code>1,3,5-7</code>) — leave pages blank to rotate the whole document.</li>
+      <li data-i18n="rotatePage.how2">Your request is applied as an explicit relative rotation on the server — the same reliable approach standard PDF processing tools use.</li>
+      <li data-i18n="rotatePage.how3">The rotated PDF is streamed back to your browser; page content itself is untouched, only each page's orientation flag changes.</li>
     </ol>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">Benefits</h2>
+    <h2 class="card-title" data-i18n="common.benefits">Benefits</h2>
     <ul class="benefits-grid">
-      <li>Free, no account or sign-up</li>
-      <li>Rotate the whole document or specific pages</li>
-      <li>90°, -90°, or 180° in one request</li>
-      <li>Files never stored on the server</li>
+      <li data-i18n="common.benefitFreeNoAccount">Free, no account or sign-up</li>
+      <li data-i18n="rotatePage.benefit2">Rotate the whole document or specific pages</li>
+      <li data-i18n="rotatePage.benefit3">90°, -90°, or 180° in one request</li>
+      <li data-i18n="common.benefitFilesNotStored">Files never stored on the server</li>
     </ul>
   </section>
 
   <section class="card landing-section">
-    <h2 class="card-title">Examples</h2>
+    <h2 class="card-title" data-i18n="common.examples">Examples</h2>
     <ul class="examples-list">
-      <li>Fix a handful of pages that were scanned sideways in an otherwise correct document.</li>
-      <li>Rotate an entire document that was scanned upside-down.</li>
-      <li>Correct just the landscape pages in a mixed portrait/landscape report.</li>
+      <li data-i18n="rotatePage.example1">Fix a handful of pages that were scanned sideways in an otherwise correct document.</li>
+      <li data-i18n="rotatePage.example2">Rotate an entire document that was scanned upside-down.</li>
+      <li data-i18n="rotatePage.example3">Correct just the landscape pages in a mixed portrait/landscape report.</li>
     </ul>
   </section>
 
   <section class="card landing-section faq">
-    <h2 class="card-title">FAQ</h2>
+    <h2 class="card-title" data-i18n="common.faq">FAQ</h2>
     <details>
-      <summary>Can I rotate just some pages, not the whole file?</summary>
-      <p>Yes — enter a page list like <code>1,3,5-7</code>; leave it blank to rotate every page.</p>
+      <summary data-i18n="rotatePage.faq1q">Can I rotate just some pages, not the whole file?</summary>
+      <p data-i18n-html="rotatePage.faq1a">Yes — enter a page list like <code>1,3,5-7</code>; leave it blank to rotate every page.</p>
     </details>
     <details>
-      <summary>What's the difference between 90° and -90°?</summary>
-      <p>90° rotates clockwise, -90° rotates counterclockwise — pick whichever direction fixes your page's orientation.</p>
+      <summary data-i18n="rotatePage.faq2q">What's the difference between 90° and -90°?</summary>
+      <p data-i18n="rotatePage.faq2a">90° rotates clockwise, -90° rotates counterclockwise — pick whichever direction fixes your page's orientation.</p>
     </details>
     <details>
-      <summary>Does rotating affect page content or quality?</summary>
-      <p>No — only the page's orientation flag changes; the underlying content stream is untouched.</p>
+      <summary data-i18n="rotatePage.faq3q">Does rotating affect page content or quality?</summary>
+      <p data-i18n="rotatePage.faq3a">No — only the page's orientation flag changes; the underlying content stream is untouched.</p>
     </details>
     <details>
-      <summary>Can I rotate different pages by different amounts in one request?</summary>
-      <p>Not in a single request — run rotate again with a different angle and page list for a second pass.</p>
+      <summary data-i18n="rotatePage.faq4q">Can I rotate different pages by different amounts in one request?</summary>
+      <p data-i18n="rotatePage.faq4a">Not in a single request — run rotate again with a different angle and page list for a second pass.</p>
     </details>
     <details>
-      <summary>Is my file stored anywhere?</summary>
-      <p>No, files are processed in memory only and never written to persistent storage.</p>
+      <summary data-i18n="common.faqStoredQ">Is my file stored anywhere?</summary>
+      <p data-i18n="common.faqStoredA">No, files are processed in memory only and never written to persistent storage.</p>
     </details>
   </section>
 
   <section class="card landing-section other-tools">
-    <h2 class="card-title">Other free PDF tools</h2>
+    <h2 class="card-title" data-i18n="common.otherToolsHeading">Other free PDF tools</h2>
     <div class="tool-links">
-      <a href="/edit-pdf">✎ Edit PDF</a>
-      <a href="/merge-pdf">🔗 Merge PDF</a>
-      <a href="/split-pdf">✂ Split PDF</a>
-      <a href="/compress-pdf">📦 Compress PDF</a>
-      <a href="/pdf-to-word">📝 PDF to Word</a>
-      <a href="/tools.html">🛠 All PDF tools</a>
-      <a href="/convert.html">⇄ All conversion formats</a>
+      <a href="/edit-pdf" data-i18n="toolLink.edit">✎ Edit PDF</a>
+      <a href="/merge-pdf" data-i18n="toolLink.merge">🔗 Merge PDF</a>
+      <a href="/split-pdf" data-i18n="toolLink.split">✂ Split PDF</a>
+      <a href="/compress-pdf" data-i18n="toolLink.compress">📦 Compress PDF</a>
+      <a href="/pdf-to-word" data-i18n="toolLink.pdfToWord">📝 PDF to Word</a>
+      <a href="/tools.html" data-i18n="toolLink.allTools">🛠 All PDF tools</a>
+      <a href="/convert.html" data-i18n="toolLink.allConversions">⇄ All conversion formats</a>
     </div>
   </section>
 </div>
 
 <script>window.PDFER_LOCK_TOOL = 'rotate';</script>
 <script src="theme.js"></script>
+<script src="i18n.js"></script>
 <script src="analytics.js"></script>
 <script src="tools.js"></script>
 </body>

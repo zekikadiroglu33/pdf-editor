@@ -50,7 +50,7 @@ function updateConfirmUI() {
   result.style.display = 'none';
   if (sessionEdits.length > 0) {
     confirmRow.classList.add('show');
-    pendingCount.textContent = `${sessionEdits.length} change(s) made this session — review the highlights above, then:`;
+    pendingCount.textContent = pdferT('app.pendingCount', '{count} change(s) made this session — review the highlights above, then:', { count: sessionEdits.length });
   } else {
     confirmRow.classList.remove('show');
   }
@@ -71,10 +71,11 @@ undoBtn.addEventListener('click', () => {
   // setFile() itself clears #status/#result as part of loading the file, so
   // the "Reverted" message must be set after it returns, not before.
   setFile(prevEntry.file, true);
-  setStatus('Reverted to the previous version.', 'ok');
+  setStatus(pdferT('app.revertedStatus', 'Reverted to the previous version.'), 'ok');
 });
 
 const setStatus = (msg, cls = '') => { status.textContent = msg; status.className = cls; };
+const errorMsg = err => pdferT('common.errorPrefix', 'Error: ') + err.message;
 
 // Marks every rendered text-layer span on this page whose content contains
 // one of this session's tracked replacement texts, so all the edits made so
@@ -134,7 +135,7 @@ async function renderPages() {
     viewerHint.style.display = 'block';
     toolbar.classList.add('show');
   } catch (err) {
-    setStatus('Could not render preview: ' + err.message, 'err');
+    setStatus(pdferT('common.couldNotRenderPreview', 'Could not render preview: ') + err.message, 'err');
   }
 }
 
@@ -149,7 +150,7 @@ async function renderPreview(file, keepZoom = false) {
     if (!keepZoom) scale = 1.5;
     await renderPages();
   } catch (err) {
-    setStatus('Could not render preview: ' + err.message, 'err');
+    setStatus(pdferT('common.couldNotRenderPreview', 'Could not render preview: ') + err.message, 'err');
   }
 }
 
@@ -289,7 +290,7 @@ async function commitInlineEdit(span, pageNum, originalText, occurrence, cancell
     return;
   }
 
-  setStatus('Editing…');
+  setStatus(pdferT('app.editingStatus', 'Editing…'));
   go.disabled = true;
   try {
     const form = new FormData();
@@ -308,7 +309,7 @@ async function commitInlineEdit(span, pageNum, originalText, occurrence, cancell
 
     if (count === '0') {
       span.textContent = originalText;
-      setStatus('Done, but no matches were found. (Try clicking the text again.)', 'err');
+      setStatus(pdferT('app.noMatchesRetry', 'Done, but no matches were found. (Try clicking the text again.)'), 'err');
       return;
     }
 
@@ -319,10 +320,10 @@ async function commitInlineEdit(span, pageNum, originalText, occurrence, cancell
 
     const editedFile = new File([blob], 'edited.pdf', { type: 'application/pdf' });
     setFile(editedFile, true);
-    setStatus('Done — inline edit applied. Click more text to keep editing.', 'ok');
+    setStatus(pdferT('app.inlineEditDone', 'Done — inline edit applied. Click more text to keep editing.'), 'ok');
   } catch (err) {
     span.textContent = originalText;
-    setStatus('Error: ' + err.message, 'err');
+    setStatus(errorMsg(err), 'err');
   } finally {
     go.disabled = false;
   }
@@ -398,7 +399,7 @@ findInput.addEventListener('input', () => { selectedTarget = null; });
 regexCheckbox.addEventListener('change', () => { selectedTarget = null; });
 
 const setFile = (f, keepZoom = false) => {
-  if (!f || f.type !== 'application/pdf') { setStatus('Please choose a PDF file.', 'err'); return; }
+  if (!f || f.type !== 'application/pdf') { setStatus(pdferT('common.pleaseChoosePdf', 'Please choose a PDF file.'), 'err'); return; }
   pdfFile = f;
   selectedTarget = null;
   // keepZoom is only ever true for a programmatic transition within the
@@ -441,7 +442,7 @@ drop.addEventListener('drop', e => {
 
 go.addEventListener('click', async () => {
   const find = document.getElementById('find').value;
-  if (!find) { setStatus('Enter the text to find.', 'err'); return; }
+  if (!find) { setStatus(pdferT('app.enterFindText', 'Enter the text to find.'), 'err'); return; }
 
   const replaceValue = document.getElementById('replace').value;
   const form = new FormData();
@@ -498,16 +499,16 @@ go.addEventListener('click', async () => {
 
     if (count === '0') {
       const why = targeted
-        ? 'The selected occurrence could not be matched — try selecting the text again.'
-        : 'Some fonts encode text non-literally — see README limitations.';
-      setStatus(`Done, but no matches were found. (${why})`, 'err');
+        ? pdferT('app.noMatchesOccurrence', 'The selected occurrence could not be matched — try selecting the text again.')
+        : pdferT('app.noMatchesEncoding', 'Some fonts encode text non-literally — see README limitations.');
+      setStatus(pdferT('app.doneNoMatches', 'Done, but no matches were found. ({why})', { why }), 'err');
     } else if (targeted) {
-      setStatus('Done — replaced your selected occurrence. Select more text to keep editing.', 'ok');
+      setStatus(pdferT('app.doneOccurrence', 'Done — replaced your selected occurrence. Select more text to keep editing.'), 'ok');
     } else {
-      setStatus(`Done — ${count} replacement(s) made. Select more text to keep editing.`, 'ok');
+      setStatus(pdferT('app.doneCount', 'Done — {count} replacement(s) made. Select more text to keep editing.', { count }), 'ok');
     }
   } catch (err) {
-    setStatus('Error: ' + err.message, 'err');
+    setStatus(errorMsg(err), 'err');
   } finally {
     go.disabled = false;
   }
