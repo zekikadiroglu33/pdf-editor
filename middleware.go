@@ -69,10 +69,14 @@ func loggingMiddleware(next http.Handler) http.Handler {
 // ---------------------------------------------------------------------------
 
 // securityHeadersMiddleware sends a strict CSP plus standard hardening
-// headers. script-src is 'self' plus Google Analytics' own script host
-// (all first-party JS, including pdf.js, is still self-hosted under
-// /static - see README; analytics.js is the one file that dynamically
-// loads a script from that host - see static/analytics.js).
+// headers. script-src is 'self' plus Google Analytics' and Google
+// AdSense's own script hosts (all first-party JS, including pdf.js, is
+// still self-hosted under /static - see README; analytics.js is the one
+// file that dynamically loads a script from the GA host - see
+// static/analytics.js - and the AdSense loader, pagead2.googlesyndication.com,
+// is embedded directly as a plain <script src=...> tag in every page's
+// <head>, exactly as Google's own AdSense site-verification snippet
+// requires, rather than injected via a same-origin wrapper file).
 // style-src is 'self' only - every page's CSS lives in style.css, and
 // visibility toggles in app.js/convert.js/tools.js set individual
 // element.style.display properties, which CSP's style-src never governs
@@ -86,17 +90,26 @@ func loggingMiddleware(next http.Handler) http.Handler {
 // collected, not which network paths the script uses) - all allowed.
 // stats.g.doubleclick.net (Google's ad-serving/remarketing domain,
 // reachable via gtag.js's default-on Conversion Linker feature) is
-// deliberately NOT allowlisted: it's ad infrastructure, not analytics,
-// and keeping it out matches this app's no-ads-tracking posture even at
-// the cost of one harmless CSP console warning from that one feature.
+// deliberately NOT allowlisted for Analytics: that's cross-device ad
+// tracking bolted onto GA itself, not the AdSense integration below, and
+// keeping it out of gtag's own reporting matches this app's no-ads-
+// tracking-via-Analytics posture even at the cost of one harmless CSP
+// console warning from that one gtag feature.
+// AdSense (pagead2.googlesyndication.com, allowlisted above and in
+// img-src/connect-src below) is a deliberate, separate exception: this
+// app does run AdSense display ads, so the ad creatives themselves need
+// frame-src entries for the two hosts Google actually serves ad iframes
+// from (googleads.g.doubleclick.net, tpc.googlesyndication.com) - without
+// those the loader script would load but every ad slot would render
+// blank, silently defeating the whole integration.
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const csp = "default-src 'self'; " +
-		"script-src 'self' https://www.googletagmanager.com; " +
+		"script-src 'self' https://www.googletagmanager.com https://pagead2.googlesyndication.com; " +
 		"style-src 'self'; " +
-		"img-src 'self' data: blob: https://www.google-analytics.com https://www.googletagmanager.com; " +
-		"connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://www.google.com; " +
+		"img-src 'self' data: blob: https://www.google-analytics.com https://www.googletagmanager.com https://pagead2.googlesyndication.com; " +
+		"connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://analytics.google.com https://www.google.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net; " +
 		"worker-src 'self' blob:; " +
-		"frame-src 'self' blob:; " +
+		"frame-src 'self' blob: https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; " +
 		"object-src 'none'; " +
 		"base-uri 'none'; " +
 		"form-action 'self'"
