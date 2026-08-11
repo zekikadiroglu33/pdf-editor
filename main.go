@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,7 +29,7 @@ var staticFS embed.FS
 // pageRoutes maps each clean, extensionless URL this site serves to the
 // source file under static/ that renders it - a page's URL is a routing
 // decision, not a filename constraint. Every other embedded asset
-// (css/js/images/robots.txt/...) is served as-is via http.FileServer.
+// (css/js/images/...) is served as-is via http.FileServer.
 var pageRoutes = map[string]string{
 	"/":             "hub.html",
 	"/edit-pdf":     "edit-pdf.html",
@@ -41,12 +42,26 @@ var pageRoutes = map[string]string{
 	"/tools.html":   "tools.html",
 }
 
+// staticAssetTypes forces an explicit Content-Type for the handful of
+// assets crawlers actually validate by header/content, rather than
+// leaving it to http.FileServer's mime.TypeByExtension guess - which
+// depends on the OS's /etc/mime.types (absent in the slim Docker runtime
+// image, so this already fell back correctly to Go's builtin ".xml"
+// default) or, failing that, sniffing the file's first 512 bytes. Both
+// paths happen to land on a non-HTML type today, but a search engine
+// rejecting a sitemap because it "appears to be an HTML page" is exactly
+// the failure mode not worth leaving to an implicit fallback chain.
+var staticAssetTypes = map[string]string{
+	"/sitemap.xml": "application/xml; charset=utf-8",
+	"/robots.txt":  "text/plain; charset=utf-8",
+}
+
 // staticHandler serves the embedded static/ tree, resolving each of
-// pageRoutes to its file once at startup - not per request, since the
-// embedded file set never changes at runtime. Google Analytics is
-// entirely a static-asset concern (see analytics.js): every page loads
-// it unconditionally via a plain <script> tag, so nothing server-side
-// needs to know about it.
+// pageRoutes and staticAssetTypes to its file once at startup - not per
+// request, since the embedded file set never changes at runtime. Google
+// Analytics is entirely a static-asset concern (see analytics.js): every
+// page loads it unconditionally via a plain <script> tag, so nothing
+// server-side needs to know about it.
 func staticHandler(fsys fs.FS) http.Handler {
 	rendered := make(map[string][]byte, len(pageRoutes))
 	for urlPath, file := range pageRoutes {
@@ -57,11 +72,25 @@ func staticHandler(fsys fs.FS) http.Handler {
 		rendered[urlPath] = data
 	}
 
+	assets := make(map[string][]byte, len(staticAssetTypes))
+	for urlPath := range staticAssetTypes {
+		data, err := fs.ReadFile(fsys, strings.TrimPrefix(urlPath, "/"))
+		if err != nil {
+			log.Fatalf("static%s: %v", urlPath, err)
+		}
+		assets[urlPath] = data
+	}
+
 	fileServer := http.FileServer(http.FS(fsys))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if data, ok := rendered[r.URL.Path]; ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.Write(data)
+			return
+		}
+		if contentType, ok := staticAssetTypes[r.URL.Path]; ok {
+			w.Header().Set("Content-Type", contentType)
+			w.Write(assets[r.URL.Path])
 			return
 		}
 		fileServer.ServeHTTP(w, r)
