@@ -96,7 +96,7 @@ The server is meant to be safe to expose directly to the public internet with no
 - Per-IP rate limiting and a process-wide concurrency cap on `/api/edit` (each request spawns two `qpdf` subprocesses).
 - Request timeouts throughout: HTTP server read/write/idle timeouts, and a bounded context on every `qpdf` call and the overall edit pipeline, so a hung or adversarial upload can't tie up a worker indefinitely.
 - Panic recovery, structured request logging, and graceful shutdown on `SIGTERM`.
-- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js and the UI's Space Grotesk webfont are both self-hosted under `static/vendor/`; Google Analytics' own domains are the one explicit allowlist exception, since `static/analytics.js` loads `gtag.js`) plus standard security headers.
+- Strict CSP (`script-src 'self'`, no third-party CDNs — PDF.js and the UI's Space Grotesk webfont are both self-hosted under `static/vendor/`; Google Analytics and Google AdSense are the explicit allowlist exceptions, since `static/analytics.js` loads `gtag.js` and every page's `<head>` loads AdSense's `adsbygoogle.js` directly — see `middleware.go`, `static/ads.txt`) plus standard security headers.
 - TLS is expected to be terminated in front of the app (reverse proxy / platform load balancer) — the binary itself serves plain HTTP.
 
 ### Sizing
