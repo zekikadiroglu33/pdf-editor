@@ -13,7 +13,12 @@ const zoomOut = document.getElementById('zoomOut');
 const zoomLevel = document.getElementById('zoomLevel');
 const undoBtn = document.getElementById('undo');
 const findInput = document.getElementById('find');
+const langSelect = document.getElementById('lang');
 const regexCheckbox = document.getElementById('regex');
+// The server pre-selects this based on the request's Accept-Language header
+// (see prefersTurkish in middleware.go) - a lightweight, IP-free proxy for
+// "this visitor probably wants Turkish", not a locale/UI translation.
+if (document.body.dataset.defaultLang === 'turkish') langSelect.value = 'turkish';
 const confirmRow = document.getElementById('confirmRow');
 const confirmBtn = document.getElementById('confirmBtn');
 const pendingCount = document.getElementById('pendingCount');

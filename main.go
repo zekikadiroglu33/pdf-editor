@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"io/fs"
@@ -62,14 +63,23 @@ var staticAssetTypes = map[string]string{
 // Analytics is entirely a static-asset concern (see analytics.js): every
 // page loads it unconditionally via a plain <script> tag, so nothing
 // server-side needs to know about it.
+// defaultLangMarker is the data-default-lang="latin" attribute the editor
+// and converter pages (edit-pdf.html, convert.html, pdf-to-word.html) carry
+// on <body> - app.js/convert.js read it to decide the language dropdown's
+// initial value. Pages without the marker (rotate/merge/split/... have no
+// language dropdown at all) are unaffected by the replace-once below.
+var defaultLangMarker = []byte(`data-default-lang="latin"`)
+
 func staticHandler(fsys fs.FS) http.Handler {
 	rendered := make(map[string][]byte, len(pageRoutes))
+	renderedTurkish := make(map[string][]byte, len(pageRoutes))
 	for urlPath, file := range pageRoutes {
 		data, err := fs.ReadFile(fsys, file)
 		if err != nil {
 			log.Fatalf("static/%s: %v", file, err)
 		}
 		rendered[urlPath] = data
+		renderedTurkish[urlPath] = bytes.Replace(data, defaultLangMarker, []byte(`data-default-lang="turkish"`), 1)
 	}
 
 	assets := make(map[string][]byte, len(staticAssetTypes))
@@ -84,7 +94,11 @@ func staticHandler(fsys fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(fsys))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if data, ok := rendered[r.URL.Path]; ok {
+			if prefersTurkish(r) {
+				data = renderedTurkish[r.URL.Path]
+			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Add("Vary", "Accept-Language")
 			w.Write(data)
 			return
 		}

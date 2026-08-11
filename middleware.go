@@ -8,6 +8,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -62,6 +64,47 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(rec, r)
 		log.Printf("%s %s %d %s %s", r.Method, r.URL.Path, rec.status, time.Since(start), clientIP(r))
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Language detection
+// ---------------------------------------------------------------------------
+
+// prefersTurkish reports whether the request's highest-priority
+// Accept-Language tag is Turkish ("tr", "tr-TR", ...). Used by staticHandler
+// to pre-select "Turkish" in the editor/converter language dropdown for
+// likely-Turkish visitors, without ever looking at (or geolocating) the
+// client's IP - consistent with this app's no-third-party-tracking stance.
+// This is a proxy for the visitor's language preference, not their
+// location: a browser set to Turkish gets it regardless of where the
+// request originates, and vice versa.
+func prefersTurkish(r *http.Request) bool {
+	header := r.Header.Get("Accept-Language")
+	if header == "" {
+		return false
+	}
+	bestTag := ""
+	bestQ := -1.0
+	for _, part := range strings.Split(header, ",") {
+		tag, qStr, hasQ := strings.Cut(strings.TrimSpace(part), ";")
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		q := 1.0
+		if hasQ {
+			if v, ok := strings.CutPrefix(strings.TrimSpace(qStr), "q="); ok {
+				if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+					q = parsed
+				}
+			}
+		}
+		if q > bestQ {
+			bestQ, bestTag = q, tag
+		}
+	}
+	primary, _, _ := strings.Cut(bestTag, "-")
+	return strings.EqualFold(primary, "tr")
 }
 
 // ---------------------------------------------------------------------------
