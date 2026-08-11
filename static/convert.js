@@ -8,6 +8,10 @@ const convGo = document.getElementById('convGo');
 const convStatus = document.getElementById('convStatus');
 const convDl = document.getElementById('convDl');
 const convLang = document.getElementById('convLang');
+// The server pre-selects this based on the request's Accept-Language header
+// (see prefersTurkish in middleware.go) - a lightweight, IP-free proxy for
+// "this visitor probably wants Turkish", not a locale/UI translation.
+if (document.body.dataset.defaultLang === 'turkish') convLang.value = 'turkish';
 const convEmptyPreview = document.getElementById('convEmptyPreview');
 const convResult = document.getElementById('convResult');
 const convMeta = document.getElementById('convMeta');
