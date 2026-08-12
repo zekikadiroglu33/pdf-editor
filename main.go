@@ -52,9 +52,14 @@ var pageRoutes = map[string]string{
 // paths happen to land on a non-HTML type today, but a search engine
 // rejecting a sitemap because it "appears to be an HTML page" is exactly
 // the failure mode not worth leaving to an implicit fallback chain.
+// ads.txt gets the same treatment: AdSense's own crawler re-fetches
+// https://<domain>/ads.txt to authorize this site's ad requests (see
+// static/ads.txt) and is exactly the kind of by-header/content validator
+// this map exists for.
 var staticAssetTypes = map[string]string{
 	"/sitemap.xml": "application/xml; charset=utf-8",
 	"/robots.txt":  "text/plain; charset=utf-8",
+	"/ads.txt":     "text/plain; charset=utf-8",
 }
 
 // defaultLangMarker is the data-default-lang="latin" attribute the editor
